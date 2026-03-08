@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SheetStatus {
+  DRAFT
+  VALIDATED
+}
+
+model Challenge {
+  id              String    @id @default(cuid())
+  name            String
+  eventDate       DateTime
+  durationMinutes Int       @default(120)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  swimmers Swimmer[]
+  lanes    Lane[]
+  rounds   Round[]
+  sheets   Sheet[]
+
+  @@map("challenges")
+}
+
+model Club {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  isHostClub Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  swimmers Swimmer[]
+
+  @@map("clubs")
+}
+
+model Section {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  swimmers Swimmer[]
+
+  @@map("sections")
+}
+
+model Swimmer {
+  id          String   @id @default(cuid())
+  challengeId String
+  number      Int
+  firstName   String
+  lastName    String
+  email       String
+  clubId      String?
+  sectionId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  challenge Challenge   @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  club      Club?       @relation(fields: [clubId], references: [id], onDelete: SetNull)
+  section   Section?    @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  entries   SheetEntry[]
+
+  @@unique([challengeId, number])
+  @@index([challengeId, number])
+  @@index([lastName])
+  @@index([firstName])
+  @@index([clubId])
+  @@index([sectionId])
+  @@map("swimmers")
+}
+
+model Lane {
+  id           String   @id @default(cuid())
+  challengeId  String
+  code         String
+  distanceM    Int
+  displayOrder Int
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  sheets    Sheet[]
+
+  @@unique([challengeId, code])
+  @@index([challengeId, displayOrder])
+  @@map("lanes")
+}
+
+model Round {
+  id            String   @id @default(cuid())
+  challengeId   String
+  roundNumber   Int
+  label         String
+  scheduledTime String?
+  displayOrder  Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  sheets    Sheet[]
+
+  @@unique([challengeId, roundNumber])
+  @@index([challengeId, displayOrder])
+  @@map("rounds")
+}
+
+model Sheet {
+  id          String      @id @default(cuid())
+  challengeId String
+  roundId     String
+  laneId      String
+  status      SheetStatus @default(DRAFT)
+  enteredBy   String?
+  validatedAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  challenge Challenge   @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  round     Round       @relation(fields: [roundId], references: [id], onDelete: Restrict)
+  lane      Lane        @relation(fields: [laneId], references: [id], onDelete: Restrict)
+  entries   SheetEntry[]
+
+  @@unique([challengeId, roundId, laneId])
+  @@index([challengeId, status])
+  @@index([roundId])
+  @@index([laneId])
+  @@map("sheets")
+}
+
+model SheetEntry {
+  id           String   @id @default(cuid())
+  sheetId      String
+  swimmerId    String
+  squares      Int
+  ticks        Int
+  totalLengths Int
+  distanceM    Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sheet   Sheet   @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  swimmer Swimmer @relation(fields: [swimmerId], references: [id], onDelete: Restrict)
+
+  @@index([sheetId])
+  @@index([swimmerId])
+  @@index([sheetId, swimmerId])
+  @@map("sheet_entries")
+}
