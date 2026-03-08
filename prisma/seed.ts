@@ -1,16 +1,33 @@
 import { PrismaClient } from "@prisma/client";
+import { buildLaneDefinitions, buildRoundDefinitions } from "../lib/challenge";
 
 const prisma = new PrismaClient();
 
 async function main() {
+  const startTime = "09:30";
+  const durationMinutes = 120;
+  const roundsCount = 4;
+  const lanes25Count = 4;
+  const lanes50Count = 6;
+
   const challenge = await prisma.challenge.upsert({
     where: { id: "challenge-v1-default" },
-    update: {},
+    update: {
+      startTime,
+      durationMinutes,
+      roundsCount,
+      lanes25Count,
+      lanes50Count,
+    },
     create: {
       id: "challenge-v1-default",
       name: "Challenge Apnée V1",
       eventDate: new Date(),
-      durationMinutes: 120,
+      startTime,
+      durationMinutes,
+      roundsCount,
+      lanes25Count,
+      lanes50Count,
     },
   });
 
@@ -40,59 +57,43 @@ async function main() {
     ),
   );
 
-  const lanes = [
-    ["25-1", 25],
-    ["25-2", 25],
-    ["25-3", 25],
-    ["25-4", 25],
-    ["50-1", 50],
-    ["50-2", 50],
-    ["50-3", 50],
-    ["50-4", 50],
-    ["50-5", 50],
-    ["50-6", 50],
-  ] as const;
+  const lanes = buildLaneDefinitions(lanes25Count, lanes50Count);
 
-  for (const [index, lane] of lanes.entries()) {
+  for (const lane of lanes) {
     await prisma.lane.upsert({
       where: {
         challengeId_code: {
           challengeId: challenge.id,
-          code: lane[0],
+          code: lane.code,
         },
       },
-      update: { distanceM: lane[1], displayOrder: index + 1, isActive: true },
+      update: { distanceM: lane.distanceM, displayOrder: lane.displayOrder, isActive: true },
       create: {
         challengeId: challenge.id,
-        code: lane[0],
-        distanceM: lane[1],
-        displayOrder: index + 1,
+        code: lane.code,
+        distanceM: lane.distanceM,
+        displayOrder: lane.displayOrder,
       },
     });
   }
 
-  const rounds = [
-    [1, "T1", "09:30"],
-    [2, "T2", "10:00"],
-    [3, "T3", "10:30"],
-    [4, "T4", "11:00"],
-  ] as const;
+  const rounds = buildRoundDefinitions(startTime, durationMinutes, roundsCount);
 
-  for (const [index, round] of rounds.entries()) {
+  for (const round of rounds) {
     await prisma.round.upsert({
       where: {
         challengeId_roundNumber: {
           challengeId: challenge.id,
-          roundNumber: round[0],
+          roundNumber: round.roundNumber,
         },
       },
-      update: { label: round[1], scheduledTime: round[2], displayOrder: index + 1 },
+      update: { label: round.label, scheduledTime: round.scheduledTime, displayOrder: round.displayOrder },
       create: {
         challengeId: challenge.id,
-        roundNumber: round[0],
-        label: round[1],
-        scheduledTime: round[2],
-        displayOrder: index + 1,
+        roundNumber: round.roundNumber,
+        label: round.label,
+        scheduledTime: round.scheduledTime,
+        displayOrder: round.displayOrder,
       },
     });
   }

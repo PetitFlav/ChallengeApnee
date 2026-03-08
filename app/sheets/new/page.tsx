@@ -1,4 +1,4 @@
-import { Prisma, SheetStatus } from "@prisma/client";
+import { SheetStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { DEFAULT_CHALLENGE_ID } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
@@ -20,6 +20,7 @@ const hasDatabaseUrl = (() => {
 type CreateSheetState = {
   error: string | null;
   success: string | null;
+  loadedSheetId: string | null;
 };
 
 type CreateSheetEntryInput = {
@@ -70,18 +71,23 @@ async function ensureDefaultChallenge() {
       id: DEFAULT_CHALLENGE_ID,
       name: "Challenge Apnée V1",
       eventDate: new Date(),
+      startTime: "09:30",
       durationMinutes: 120,
+      roundsCount: 4,
+      lanes25Count: 4,
+      lanes50Count: 6,
     },
   });
 }
 
-async function createSheet(_prevState: CreateSheetState, formData: FormData): Promise<CreateSheetState> {
+async function saveSheet(_prevState: CreateSheetState, formData: FormData): Promise<CreateSheetState> {
   "use server";
 
   if (!hasDatabaseUrl) {
     return {
       error: "Base de données indisponible.",
       success: null,
+      loadedSheetId: null,
     };
   }
 
@@ -94,6 +100,7 @@ async function createSheet(_prevState: CreateSheetState, formData: FormData): Pr
     return {
       error: "Sélectionnez une tournée et une ligne.",
       success: null,
+      loadedSheetId: null,
     };
   }
 
@@ -103,6 +110,7 @@ async function createSheet(_prevState: CreateSheetState, formData: FormData): Pr
     return {
       error: "Ajoutez au moins une saisie nageur valide.",
       success: null,
+      loadedSheetId: null,
     };
   }
 
@@ -114,6 +122,7 @@ async function createSheet(_prevState: CreateSheetState, formData: FormData): Pr
     return {
       error: "Un numéro de nageur ne peut apparaître qu'une fois sur une même feuille.",
       success: null,
+      loadedSheetId: null,
     };
   }
 
@@ -132,6 +141,7 @@ async function createSheet(_prevState: CreateSheetState, formData: FormData): Pr
     return {
       error: "Tournée ou ligne introuvable.",
       success: null,
+      loadedSheetId: null,
     };
   }
 
@@ -148,11 +158,12 @@ async function createSheet(_prevState: CreateSheetState, formData: FormData): Pr
     return {
       error: `Nageur introuvable pour les numéros: ${missingSwimmerNumbers.join(", ")}.`,
       success: null,
+      loadedSheetId: null,
     };
   }
 
   try {
-    await prisma.$transaction(async (tx) => {
+    const sheet = await prisma.$transaction(async (tx) => {
       const existingSheet = await tx.sheet.findFirst({
         where: {
           challengeId: challenge.id,
@@ -162,15 +173,36 @@ async function createSheet(_prevState: CreateSheetState, formData: FormData): Pr
         select: { id: true },
       });
 
-      if (existingSheet) {
-        throw new Error("SHEET_ALREADY_EXISTS");
+      if (!existingSheet) {
+        return tx.sheet.create({
+          data: {
+            challengeId: challenge.id,
+            roundId,
+            laneId,
+            status: SheetStatus.VALIDATED,
+            validatedAt: new Date(),
+            entries: {
+              create: entries.map((entry) => {
+                const totalLengths = entry.squares * 4 + entry.ticks;
+                return {
+                  swimmerId: swimmerIdByNumber.get(entry.swimmerNumber) as string,
+                  squares: entry.squares,
+                  ticks: entry.ticks,
+                  totalLengths,
+                  distanceM: totalLengths * lane.distanceM,
+                };
+              }),
+            },
+          },
+          select: { id: true },
+        });
       }
 
-      await tx.sheet.create({
+      await tx.sheetEntry.deleteMany({ where: { sheetId: existingSheet.id } });
+
+      await tx.sheet.update({
+        where: { id: existingSheet.id },
         data: {
-          challengeId: challenge.id,
-          roundId,
-          laneId,
           status: SheetStatus.VALIDATED,
           validatedAt: new Date(),
           entries: {
@@ -187,33 +219,24 @@ async function createSheet(_prevState: CreateSheetState, formData: FormData): Pr
           },
         },
       });
+
+      return existingSheet;
     });
 
     revalidatePath("/sheets");
     revalidatePath("/sheets/new");
+    revalidatePath("/dashboard");
 
     return {
       error: null,
-      success: "Feuille validée avec succès.",
+      success: "Feuille enregistrée avec succès.",
+      loadedSheetId: sheet.id,
     };
-  } catch (error) {
-    if (error instanceof Error && error.message === "SHEET_ALREADY_EXISTS") {
-      return {
-        error: "Cette feuille existe déjà pour la tournée et la ligne sélectionnées.",
-        success: null,
-      };
-    }
-
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return {
-        error: "Cette feuille existe déjà pour la tournée et la ligne sélectionnées.",
-        success: null,
-      };
-    }
-
+  } catch {
     return {
-      error: "Impossible de valider la feuille. Vérifiez les données et réessayez.",
+      error: "Impossible d'enregistrer la feuille. Vérifiez les données et réessayez.",
       success: null,
+      loadedSheetId: null,
     };
   }
 }
@@ -233,7 +256,7 @@ export default async function NewSheetPage() {
   try {
     const challenge = await ensureDefaultChallenge();
 
-    const [rounds, lanes, swimmers] = await Promise.all([
+    const [rounds, lanes, swimmers, existingSheets] = await Promise.all([
       prisma.round.findMany({
         where: { challengeId: challenge.id },
         orderBy: [{ displayOrder: "asc" }, { roundNumber: "asc" }],
@@ -259,14 +282,22 @@ export default async function NewSheetPage() {
           number: true,
           firstName: true,
           lastName: true,
-          club: {
+          club: { select: { name: true } },
+          section: { select: { name: true } },
+        },
+      }),
+      prisma.sheet.findMany({
+        where: { challengeId: challenge.id },
+        select: {
+          id: true,
+          roundId: true,
+          laneId: true,
+          entries: {
+            orderBy: { createdAt: "asc" },
             select: {
-              name: true,
-            },
-          },
-          section: {
-            select: {
-              name: true,
+              swimmer: { select: { number: true } },
+              squares: true,
+              ticks: true,
             },
           },
         },
@@ -276,16 +307,7 @@ export default async function NewSheetPage() {
     return (
       <div className="space-y-4">
         <h1 className="text-3xl font-semibold">Nouvelle feuille</h1>
-        <p className="text-sm text-slate-600">
-          Saisissez la tournée, la ligne puis les nageurs. Les calculs sont mis à jour automatiquement.
-        </p>
-
-        {rounds.length === 0 || lanes.length === 0 ? (
-          <div className="rounded border border-amber-300 bg-amber-50 p-4 text-amber-800">
-            Veuillez créer des tournées et des lignes actives avant de saisir une feuille.
-          </div>
-        ) : null}
-
+        <p className="text-slate-600">Sélectionnez tournée + ligne, puis saisissez les nageurs.</p>
         <NewSheetForm
           rounds={rounds}
           lanes={lanes}
@@ -297,7 +319,17 @@ export default async function NewSheetPage() {
             clubName: swimmer.club?.name ?? "-",
             sectionName: swimmer.section?.name ?? "-",
           }))}
-          action={createSheet}
+          existingSheets={existingSheets.map((sheet) => ({
+            id: sheet.id,
+            roundId: sheet.roundId,
+            laneId: sheet.laneId,
+            rows: sheet.entries.map((entry) => ({
+              swimmerNumber: String(entry.swimmer.number),
+              squares: String(entry.squares),
+              ticks: String(entry.ticks),
+            })),
+          }))}
+          action={saveSheet}
         />
       </div>
     );

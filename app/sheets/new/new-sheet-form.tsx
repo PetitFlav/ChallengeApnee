@@ -29,15 +29,24 @@ type SheetRow = {
   ticks: string;
 };
 
+type ExistingSheet = {
+  id: string;
+  roundId: string;
+  laneId: string;
+  rows: SheetRow[];
+};
+
 type CreateSheetState = {
   error: string | null;
   success: string | null;
+  loadedSheetId: string | null;
 };
 
 type Props = {
   rounds: RoundOption[];
   lanes: LaneOption[];
   swimmers: SwimmerOption[];
+  existingSheets: ExistingSheet[];
   action: (state: CreateSheetState, formData: FormData) => Promise<CreateSheetState>;
 };
 
@@ -47,11 +56,12 @@ const EMPTY_ROW: SheetRow = {
   ticks: "",
 };
 
-export function NewSheetForm({ rounds, lanes, swimmers, action }: Props) {
-  const [state, formAction] = useFormState(action, { error: null, success: null });
+export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action }: Props) {
+  const [state, formAction] = useFormState(action, { error: null, success: null, loadedSheetId: null });
   const [roundId, setRoundId] = useState("");
   const [laneId, setLaneId] = useState("");
   const [rows, setRows] = useState<SheetRow[]>([EMPTY_ROW, EMPTY_ROW, EMPTY_ROW, EMPTY_ROW]);
+  const [loadedMessage, setLoadedMessage] = useState<string | null>(null);
 
   const swimmerByNumber = useMemo(() => {
     const map = new Map<number, SwimmerOption>();
@@ -62,6 +72,11 @@ export function NewSheetForm({ rounds, lanes, swimmers, action }: Props) {
   }, [swimmers]);
 
   const selectedLane = useMemo(() => lanes.find((lane) => lane.id === laneId) ?? null, [laneId, lanes]);
+
+  const selectedSheet = useMemo(
+    () => existingSheets.find((sheet) => sheet.roundId === roundId && sheet.laneId === laneId) ?? null,
+    [existingSheets, laneId, roundId],
+  );
 
   const normalizedRows = useMemo(() => {
     return rows
@@ -93,12 +108,33 @@ export function NewSheetForm({ rounds, lanes, swimmers, action }: Props) {
   }, [normalizedRows, selectedLane]);
 
   useEffect(() => {
+    if (!roundId || !laneId) {
+      setLoadedMessage(null);
+      return;
+    }
+
+    if (!selectedSheet) {
+      setRows([EMPTY_ROW, EMPTY_ROW, EMPTY_ROW, EMPTY_ROW]);
+      setLoadedMessage(null);
+      return;
+    }
+
+    setRows(selectedSheet.rows.length > 0 ? selectedSheet.rows : [EMPTY_ROW]);
+    setLoadedMessage("Feuille existante chargée : vous pouvez modifier, supprimer ou ajouter des lignes nageur.");
+  }, [laneId, roundId, selectedSheet]);
+
+  useEffect(() => {
     if (!state.success) return;
+    if (state.loadedSheetId) {
+      setLoadedMessage("Feuille existante mise à jour avec succès.");
+      return;
+    }
 
     setRoundId("");
     setLaneId("");
     setRows([EMPTY_ROW, EMPTY_ROW, EMPTY_ROW, EMPTY_ROW]);
-  }, [state.success]);
+    setLoadedMessage(null);
+  }, [state.loadedSheetId, state.success]);
 
   function updateRow(index: number, patch: Partial<SheetRow>) {
     setRows((previousRows) => previousRows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
@@ -150,6 +186,8 @@ export function NewSheetForm({ rounds, lanes, swimmers, action }: Props) {
           </p>
         </div>
       </div>
+
+      {loadedMessage ? <p className="rounded border border-blue-200 bg-blue-50 p-2 text-sm text-blue-700">{loadedMessage}</p> : null}
 
       <div className="overflow-x-auto rounded border">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -250,7 +288,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, action }: Props) {
       ) : null}
 
       <button type="submit" className="rounded bg-blue-600 px-4 py-2 text-white">
-        Valider la feuille
+        Enregistrer la feuille
       </button>
     </form>
   );

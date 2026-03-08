@@ -17,7 +17,11 @@ model Challenge {
   id              String    @id @default(cuid())
   name            String
   eventDate       DateTime
+  startTime       String    @default("09:30")
   durationMinutes Int       @default(120)
+  roundsCount     Int       @default(4)
+  lanes25Count    Int       @default(4)
+  lanes50Count    Int       @default(6)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

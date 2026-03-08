@@ -24,7 +24,11 @@ async function ensureDefaultChallenge() {
       id: DEFAULT_CHALLENGE_ID,
       name: "Challenge Apnée V1",
       eventDate: new Date(),
+      startTime: "09:30",
       durationMinutes: 120,
+      roundsCount: 4,
+      lanes25Count: 4,
+      lanes50Count: 6,
     },
   });
 }

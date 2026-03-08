@@ -6,6 +6,7 @@ const links = [
   ["/sheets", "Feuilles"],
   ["/sheets/new", "Nouvelle feuille"],
   ["/dashboard", "Dashboard"],
+  ["/event", "Configuration événement"],
   ["/public", "Écran public"],
 ] as const;
 
