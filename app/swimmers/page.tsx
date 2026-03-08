@@ -1,6 +1,8 @@
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { DEFAULT_CHALLENGE_ID } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
+import { SwimmerCreateForm } from "./swimmer-create-form";
 
 export const dynamic = "force-dynamic";
 const databaseUrl = process.env.DATABASE_URL;
@@ -27,26 +29,99 @@ async function ensureDefaultChallenge() {
   });
 }
 
-async function createSwimmer(formData: FormData) {
-  "use server";
+type CreateSwimmerState = {
+  error: string | null;
+  success: boolean;
+  nextNumber: number;
+};
 
-  if (!hasDatabaseUrl) return;
-
-  const challenge = await ensureDefaultChallenge();
-
-  await prisma.swimmer.create({
-    data: {
-      challengeId: challenge.id,
-      number: Number(formData.get("number")),
-      firstName: String(formData.get("firstName") || "").trim(),
-      lastName: String(formData.get("lastName") || "").trim(),
-      email: String(formData.get("email") || "").trim(),
-      clubId: String(formData.get("clubId") || "") || null,
-      sectionId: String(formData.get("sectionId") || "") || null,
-    },
+async function getNextSwimmerNumber(challengeId: string) {
+  const currentMax = await prisma.swimmer.aggregate({
+    where: { challengeId },
+    _max: { number: true },
   });
 
+  return (currentMax._max.number ?? 0) + 1;
+}
+
+async function createSwimmer(_prevState: CreateSwimmerState, formData: FormData): Promise<CreateSwimmerState> {
+  "use server";
+
+  if (!hasDatabaseUrl) {
+    return {
+      error: "Base de données indisponible.",
+      success: false,
+      nextNumber: 1,
+    };
+  }
+
+  const challenge = await ensureDefaultChallenge();
+  const fallbackNextNumber = await getNextSwimmerNumber(challenge.id);
+  const number = Number(formData.get("number"));
+
+  if (!Number.isInteger(number) || number < 1) {
+    return {
+      error: "Le numéro doit être un entier positif.",
+      success: false,
+      nextNumber: fallbackNextNumber,
+    };
+  }
+
+  const existingSwimmer = await prisma.swimmer.findUnique({
+    where: {
+      challengeId_number: {
+        challengeId: challenge.id,
+        number,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (existingSwimmer) {
+    return {
+      error: `Le numéro ${number} est déjà utilisé pour ce challenge.`,
+      success: false,
+      nextNumber: fallbackNextNumber,
+    };
+  }
+
+  try {
+    await prisma.swimmer.create({
+      data: {
+        challengeId: challenge.id,
+        number,
+        firstName: String(formData.get("firstName") || "").trim(),
+        lastName: String(formData.get("lastName") || "").trim(),
+        email: String(formData.get("email") || "").trim(),
+        clubId: String(formData.get("clubId") || "") || null,
+        sectionId: String(formData.get("sectionId") || "") || null,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return {
+        error: `Le numéro ${number} est déjà utilisé pour ce challenge.`,
+        success: false,
+        nextNumber: fallbackNextNumber,
+      };
+    }
+
+    return {
+      error: "Impossible de créer le nageur. Vérifiez les données et réessayez.",
+      success: false,
+      nextNumber: fallbackNextNumber,
+    };
+  }
+
+  const nextNumber = await getNextSwimmerNumber(challenge.id);
+
   revalidatePath("/swimmers");
+
+  return {
+    error: null,
+    success: true,
+    nextNumber,
+  };
 }
 
 async function updateSwimmer(formData: FormData) {
@@ -150,7 +225,7 @@ export default async function SwimmersPage({
     const searchNumber = Number(query);
     const hasSearchNumber = !Number.isNaN(searchNumber);
 
-    const [swimmers, clubs, sections] = await Promise.all([
+    const [swimmers, clubs, sections, nextSwimmerNumber] = await Promise.all([
       prisma.swimmer.findMany({
         where: {
           challengeId: challenge.id,
@@ -169,6 +244,7 @@ export default async function SwimmersPage({
       }),
       prisma.club.findMany({ orderBy: { name: "asc" } }),
       prisma.section.findMany({ orderBy: { name: "asc" } }),
+      getNextSwimmerNumber(challenge.id),
     ]);
 
   return (
@@ -177,31 +253,12 @@ export default async function SwimmersPage({
 
       <section className="rounded border bg-white p-4">
         <h2 className="mb-3 text-xl font-medium">Créer un nageur</h2>
-        <form action={createSwimmer} className="grid gap-3 md:grid-cols-6">
-          <input name="number" type="number" placeholder="Numéro" required className="rounded border p-2" />
-          <input name="firstName" placeholder="Prénom" required className="rounded border p-2" />
-          <input name="lastName" placeholder="Nom" required className="rounded border p-2" />
-          <input name="email" type="email" placeholder="Email" required className="rounded border p-2" />
-          <select name="clubId" className="rounded border p-2">
-            <option value="">Sans club</option>
-            {clubs.map((club) => (
-              <option key={club.id} value={club.id}>
-                {club.name}
-              </option>
-            ))}
-          </select>
-          <select name="sectionId" className="rounded border p-2">
-            <option value="">Sans section</option>
-            {sections.map((section) => (
-              <option key={section.id} value={section.id}>
-                {section.name}
-              </option>
-            ))}
-          </select>
-          <button type="submit" className="rounded bg-blue-600 p-2 text-white md:col-span-6">
-            Ajouter
-          </button>
-        </form>
+        <SwimmerCreateForm
+          clubs={clubs}
+          sections={sections}
+          defaultNumber={nextSwimmerNumber}
+          action={createSwimmer}
+        />
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
