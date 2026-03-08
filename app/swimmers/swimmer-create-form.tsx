@@ -29,22 +29,21 @@ export function SwimmerCreateForm({ clubs, sections, defaultNumber, action }: Pr
 
     formRef.current?.reset();
 
-    const numberInput = formRef.current?.elements.namedItem("number") as HTMLInputElement | null;
-    if (numberInput) {
-      numberInput.value = String(state.nextNumber);
+    const numberPreview = formRef.current?.elements.namedItem("numberPreview") as HTMLInputElement | null;
+    if (numberPreview) {
+      numberPreview.value = String(state.nextNumber);
     }
   }, [state.nextNumber, state.success]);
 
   return (
     <form ref={formRef} action={formAction} className="grid gap-3 md:grid-cols-6">
       <input
-        name="number"
+        name="numberPreview"
         type="number"
-        placeholder="Numéro"
-        required
-        min={1}
         defaultValue={defaultNumber}
-        className="rounded border p-2"
+        readOnly
+        aria-label="Prochain numéro"
+        className="rounded border bg-slate-100 p-2 text-slate-700"
       />
       <input name="firstName" placeholder="Prénom" required className="rounded border p-2" />
       <input name="lastName" placeholder="Nom" required className="rounded border p-2" />
