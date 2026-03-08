@@ -129,7 +129,30 @@ async function deleteSwimmer(formData: FormData) {
 
   if (!hasDatabaseUrl) return;
 
-  await prisma.swimmer.delete({ where: { id: String(formData.get("id")) } });
+  const swimmerId = String(formData.get("id") || "").trim();
+  if (!swimmerId) return;
+
+  await prisma.$transaction(async (tx) => {
+    const swimmerToDelete = await tx.swimmer.findUnique({
+      where: { id: swimmerId },
+      select: { id: true, challengeId: true, number: true },
+    });
+
+    if (!swimmerToDelete) return;
+
+    await tx.swimmer.delete({ where: { id: swimmerToDelete.id } });
+
+    await tx.swimmer.updateMany({
+      where: {
+        challengeId: swimmerToDelete.challengeId,
+        number: { gt: swimmerToDelete.number },
+      },
+      data: {
+        number: { decrement: 1 },
+      },
+    });
+  });
+
   revalidatePath("/swimmers");
 }
 
