@@ -30,6 +30,45 @@ type CreateSheetEntryInput = {
   ticks: number;
 };
 
+type RoundProgressOption = {
+  id: string;
+  label: string;
+  status: "pending" | "active" | "closed";
+  isSelectable: boolean;
+};
+
+function buildRoundProgress(
+  rounds: Array<{ id: string; label: string }>,
+  lanesCount: number,
+  sheets: Array<{ roundId: string }>,
+): RoundProgressOption[] {
+  const sheetsCountByRoundId = new Map<string, number>();
+
+  for (const sheet of sheets) {
+    sheetsCountByRoundId.set(sheet.roundId, (sheetsCountByRoundId.get(sheet.roundId) ?? 0) + 1);
+  }
+
+  const firstIncompleteRoundIndex = rounds.findIndex((round) => (sheetsCountByRoundId.get(round.id) ?? 0) < lanesCount);
+
+  return rounds.map((round, index) => {
+    const status: RoundProgressOption["status"] =
+      firstIncompleteRoundIndex === -1
+        ? "closed"
+        : index < firstIncompleteRoundIndex
+          ? "closed"
+          : index === firstIncompleteRoundIndex
+            ? "active"
+            : "pending";
+
+    return {
+      id: round.id,
+      label: round.label,
+      status,
+      isSelectable: status === "active",
+    };
+  });
+}
+
 function parseEntries(entriesJson: string): CreateSheetEntryInput[] | null {
   try {
     const parsed = JSON.parse(entriesJson) as unknown;
@@ -110,7 +149,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
     };
   }
 
-  const [round, lane, swimmers] = await Promise.all([
+  const [round, lane, swimmers, rounds, lanesCount, sheetsForProgress] = await Promise.all([
     prisma.round.findFirst({ where: { id: roundId, challengeId: challenge.id } }),
     prisma.lane.findFirst({ where: { id: laneId, challengeId: challenge.id } }),
     prisma.swimmer.findMany({
@@ -119,11 +158,29 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
         number: { in: entries.map((entry) => entry.swimmerNumber) },
       },
     }),
+    prisma.round.findMany({
+      where: { challengeId: challenge.id },
+      orderBy: [{ displayOrder: "asc" }, { roundNumber: "asc" }],
+      select: { id: true, label: true },
+    }),
+    prisma.lane.count({ where: { challengeId: challenge.id, isActive: true } }),
+    prisma.sheet.findMany({ where: { challengeId: challenge.id }, select: { roundId: true } }),
   ]);
 
   if (!round || !lane) {
     return {
       error: "Tournée ou ligne introuvable.",
+      success: null,
+      loadedSheetId: null,
+    };
+  }
+
+  const roundsWithProgress = buildRoundProgress(rounds, lanesCount, sheetsForProgress);
+  const activeRound = roundsWithProgress.find((candidateRound) => candidateRound.status === "active") ?? null;
+
+  if (!activeRound || activeRound.id !== roundId) {
+    return {
+      error: "La tournée sélectionnée n'est pas ouverte à la saisie.",
       success: null,
       loadedSheetId: null,
     };
@@ -300,6 +357,8 @@ export default async function NewSheetPage() {
       }),
     ]);
 
+    const roundsWithProgress = buildRoundProgress(rounds, lanes.length, existingSheets);
+
     return (
       <div className="space-y-4">
         <BackToMainMenuLink />
@@ -311,7 +370,7 @@ export default async function NewSheetPage() {
           </div>
         ) : null}
         <NewSheetForm
-          rounds={rounds}
+          rounds={roundsWithProgress}
           lanes={lanes}
           swimmers={swimmers.map((swimmer) => ({
             id: swimmer.id,

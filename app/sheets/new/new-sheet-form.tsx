@@ -6,6 +6,8 @@ import { useFormState } from "react-dom";
 type RoundOption = {
   id: string;
   label: string;
+  status: "pending" | "active" | "closed";
+  isSelectable: boolean;
 };
 
 type LaneOption = {
@@ -63,6 +65,9 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
   const [laneId, setLaneId] = useState("");
   const [rows, setRows] = useState<SheetRow[]>([EMPTY_ROW, EMPTY_ROW, EMPTY_ROW, EMPTY_ROW]);
   const [loadedMessage, setLoadedMessage] = useState<string | null>(null);
+  const [roundSelectionMessage, setRoundSelectionMessage] = useState<string | null>(null);
+
+  const activeRound = useMemo(() => rounds.find((round) => round.status === "active") ?? null, [rounds]);
 
   const swimmerByNumber = useMemo(() => {
     const map = new Map<number, SwimmerOption>();
@@ -109,6 +114,13 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
   }, [normalizedRows, selectedLane]);
 
   useEffect(() => {
+    if (roundId) return;
+    if (!activeRound) return;
+
+    setRoundId(activeRound.id);
+  }, [activeRound, roundId]);
+
+  useEffect(() => {
     if (!roundId || !laneId) {
       setLoadedMessage(null);
       return;
@@ -141,6 +153,30 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
     setRows((previousRows) => previousRows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
   }
 
+  const hasInProgressSheet = Boolean(roundId && laneId && normalizedRows.length > 0);
+
+  function handleRoundChange(nextRoundId: string) {
+    const targetRound = rounds.find((round) => round.id === nextRoundId);
+
+    if (targetRound && !targetRound.isSelectable) {
+      return;
+    }
+
+    if (hasInProgressSheet && nextRoundId !== roundId) {
+      setRoundSelectionMessage("Finissez votre saisie en cours, puis changez de tournée de saisie.");
+      return;
+    }
+
+    setRoundSelectionMessage(null);
+    setRoundId(nextRoundId);
+  }
+
+  function getRoundOptionLabel(round: RoundOption) {
+    if (round.status === "active") return `${round.label} (en cours)`;
+    if (round.status === "closed") return `${round.label} (terminée)`;
+    return `${round.label} (à venir)`;
+  }
+
   return (
     <form action={formAction} className="space-y-4 rounded border bg-white p-4">
       <div className="grid gap-3 md:grid-cols-3">
@@ -150,14 +186,14 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
             name="roundId"
             disabled={disabled}
             value={roundId}
-            onChange={(event) => setRoundId(event.target.value)}
+            onChange={(event) => handleRoundChange(event.target.value)}
             required
             className="w-full rounded border p-2"
           >
             <option value="">Sélectionner une tournée</option>
             {rounds.map((round) => (
-              <option key={round.id} value={round.id}>
-                {round.label}
+              <option key={round.id} value={round.id} disabled={!round.isSelectable}>
+                {getRoundOptionLabel(round)}
               </option>
             ))}
           </select>
@@ -191,6 +227,9 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
       </div>
 
       {loadedMessage ? <p className="rounded border border-blue-200 bg-blue-50 p-2 text-sm text-blue-700">{loadedMessage}</p> : null}
+      {roundSelectionMessage ? (
+        <p className="rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-700">{roundSelectionMessage}</p>
+      ) : null}
 
       <div className="overflow-x-auto rounded border">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
