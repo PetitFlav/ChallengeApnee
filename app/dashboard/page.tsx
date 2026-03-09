@@ -1,4 +1,4 @@
-import { DEFAULT_CHALLENGE_ID } from "@/lib/constants";
+import { ensureActiveChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -14,23 +14,6 @@ const hasDatabaseUrl = (() => {
   }
 })();
 
-async function ensureDefaultChallenge() {
-  return prisma.challenge.upsert({
-    where: { id: DEFAULT_CHALLENGE_ID },
-    update: {},
-    create: {
-      id: DEFAULT_CHALLENGE_ID,
-      name: "Challenge Apnée V1",
-      eventDate: new Date(),
-      startTime: "09:30",
-      durationMinutes: 120,
-      roundsCount: 4,
-      lanes25Count: 4,
-      lanes50Count: 6,
-    },
-  });
-}
-
 export default async function DashboardPage() {
   if (!hasDatabaseUrl) {
     return (
@@ -44,7 +27,7 @@ export default async function DashboardPage() {
   }
 
   try {
-    const challenge = await ensureDefaultChallenge();
+    const challenge = await ensureActiveChallenge();
 
     const [total, validatedSheetsCount] = await Promise.all([
       prisma.sheetEntry.aggregate({

@@ -1,6 +1,6 @@
 import { SheetStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import { DEFAULT_CHALLENGE_ID } from "@/lib/constants";
+import { ensureActiveChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { NewSheetForm } from "./new-sheet-form";
 
@@ -63,23 +63,6 @@ function parseEntries(entriesJson: string): CreateSheetEntryInput[] | null {
   }
 }
 
-async function ensureDefaultChallenge() {
-  return prisma.challenge.upsert({
-    where: { id: DEFAULT_CHALLENGE_ID },
-    update: {},
-    create: {
-      id: DEFAULT_CHALLENGE_ID,
-      name: "Challenge Apnée V1",
-      eventDate: new Date(),
-      startTime: "09:30",
-      durationMinutes: 120,
-      roundsCount: 4,
-      lanes25Count: 4,
-      lanes50Count: 6,
-    },
-  });
-}
-
 async function saveSheet(_prevState: CreateSheetState, formData: FormData): Promise<CreateSheetState> {
   "use server";
 
@@ -91,7 +74,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
     };
   }
 
-  const challenge = await ensureDefaultChallenge();
+  const challenge = await ensureActiveChallenge();
   const roundId = String(formData.get("roundId") || "").trim();
   const laneId = String(formData.get("laneId") || "").trim();
   const entriesJson = String(formData.get("entriesJson") || "[]");
@@ -254,7 +237,7 @@ export default async function NewSheetPage() {
   }
 
   try {
-    const challenge = await ensureDefaultChallenge();
+    const challenge = await ensureActiveChallenge();
 
     const [rounds, lanes, swimmers, existingSheets] = await Promise.all([
       prisma.round.findMany({

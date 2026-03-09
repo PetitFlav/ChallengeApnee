@@ -1,0 +1,114 @@
+import { redirect } from "next/navigation";
+import { regenerateEventStructure, sanitizeStartTime } from "@/lib/challenge";
+import { createDefaultEvent, setActiveChallenge } from "@/lib/events";
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
+
+const databaseUrl = process.env.DATABASE_URL;
+const hasDatabaseUrl = (() => {
+  if (!databaseUrl) return false;
+  try {
+    new URL(databaseUrl);
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+async function createEvent(formData: FormData) {
+  "use server";
+
+  if (!hasDatabaseUrl) return;
+
+  const name = String(formData.get("name") || "").trim() || "Challenge Apnée";
+  const eventDateRaw = String(formData.get("eventDate") || "").trim();
+  const startTime = sanitizeStartTime(String(formData.get("startTime") || "09:30").trim());
+  const durationMinutes = Math.max(30, Number.parseInt(String(formData.get("durationMinutes") || "120"), 10) || 120);
+  const roundsCount = Math.max(1, Number.parseInt(String(formData.get("roundsCount") || "4"), 10) || 4);
+  const lanes25Count = Math.max(0, Number.parseInt(String(formData.get("lanes25Count") || "4"), 10) || 4);
+  const lanes50Count = Math.max(0, Number.parseInt(String(formData.get("lanes50Count") || "6"), 10) || 6);
+  const shouldActivate = Boolean(formData.get("isActive"));
+
+  const eventDate = eventDateRaw ? new Date(`${eventDateRaw}T00:00:00`) : new Date();
+
+  const challenge = await createDefaultEvent({ active: false });
+
+  await regenerateEventStructure(prisma, challenge.id, {
+    name,
+    eventDate,
+    startTime,
+    durationMinutes,
+    roundsCount,
+    lanes25Count,
+    lanes50Count,
+  });
+
+  if (shouldActivate) {
+    await setActiveChallenge(challenge.id);
+  }
+
+  redirect(`/events/${challenge.id}`);
+}
+
+export default function NewEventPage() {
+  if (!hasDatabaseUrl) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-3xl font-semibold">Nouvel événement</h1>
+        <div className="rounded border border-amber-300 bg-amber-50 p-4 text-amber-800">
+          Définissez la variable DATABASE_URL pour activer la gestion des événements.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-semibold">Nouvel événement</h1>
+        <p className="text-slate-600">Créez un événement avec sa configuration initiale.</p>
+      </div>
+
+      <form action={createEvent} className="grid gap-4 rounded border bg-white p-4 md:grid-cols-2">
+        <label className="space-y-1">
+          <span className="text-sm font-medium text-slate-700">Nom</span>
+          <input name="name" required className="w-full rounded border p-2" />
+        </label>
+        <label className="space-y-1">
+          <span className="text-sm font-medium text-slate-700">Date</span>
+          <input type="date" name="eventDate" required className="w-full rounded border p-2" />
+        </label>
+        <label className="space-y-1">
+          <span className="text-sm font-medium text-slate-700">Heure de début</span>
+          <input type="time" name="startTime" defaultValue="09:30" required className="w-full rounded border p-2" />
+        </label>
+        <label className="space-y-1">
+          <span className="text-sm font-medium text-slate-700">Durée (minutes)</span>
+          <input type="number" name="durationMinutes" min={30} defaultValue={120} required className="w-full rounded border p-2" />
+        </label>
+        <label className="space-y-1">
+          <span className="text-sm font-medium text-slate-700">Nombre de tournées</span>
+          <input type="number" name="roundsCount" min={1} defaultValue={4} required className="w-full rounded border p-2" />
+        </label>
+        <label className="space-y-1">
+          <span className="text-sm font-medium text-slate-700">Nombre de lignes 25m</span>
+          <input type="number" name="lanes25Count" min={0} defaultValue={4} required className="w-full rounded border p-2" />
+        </label>
+        <label className="space-y-1">
+          <span className="text-sm font-medium text-slate-700">Nombre de lignes 50m</span>
+          <input type="number" name="lanes50Count" min={0} defaultValue={6} required className="w-full rounded border p-2" />
+        </label>
+        <label className="flex items-center gap-2 md:col-span-2">
+          <input type="checkbox" name="isActive" defaultChecked />
+          <span className="text-sm text-slate-700">Activer cet événement après création</span>
+        </label>
+        <div className="md:col-span-2">
+          <button type="submit" className="rounded bg-blue-600 px-4 py-2 text-white">
+            Créer
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
