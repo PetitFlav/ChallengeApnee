@@ -182,27 +182,27 @@ export default async function EventsPage({
                       <Link href={`/events/${event.id}`} className="rounded border px-3 py-1 hover:bg-slate-100">
                         Ouvrir
                       </Link>
-                      {!event.isArchived ? (
-                        !event.isActive ? (
-                          <form action={activateEvent}>
-                            <input type="hidden" name="id" value={event.id} />
-                            <button type="submit" className="rounded bg-emerald-600 px-3 py-1 text-white">
-                              Activer
-                            </button>
-                          </form>
-                        ) : (
-                          <span className="rounded bg-emerald-100 px-3 py-1 text-emerald-800">Actif</span>
-                        )
-                      ) : null}
-                      {!event.isArchived ? (
-                        <form action={toggleArchiveEvent}>
+                      {event.isActive ? (
+                        <span className="rounded bg-emerald-100 px-3 py-1 text-emerald-800">Actif</span>
+                      ) : (
+                        <form action={activateEvent}>
                           <input type="hidden" name="id" value={event.id} />
-                          <input type="hidden" name="isArchived" value={String(event.isArchived)} />
-                          <button type="submit" className="rounded bg-slate-700 px-3 py-1 text-white">
-                            Archiver
+                          <button
+                            type="submit"
+                            disabled={event.isArchived}
+                            className="rounded bg-emerald-600 px-3 py-1 text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+                          >
+                            Activer
                           </button>
                         </form>
-                      ) : null}
+                      )}
+                      <form action={toggleArchiveEvent}>
+                        <input type="hidden" name="id" value={event.id} />
+                        <input type="hidden" name="isArchived" value={String(event.isArchived)} />
+                        <button type="submit" className="rounded bg-slate-700 px-3 py-1 text-white">
+                          {event.isArchived ? "Désarchiver" : "Archiver"}
+                        </button>
+                      </form>
                     </div>
                   </td>
                 </tr>

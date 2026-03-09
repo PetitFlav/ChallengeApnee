@@ -81,25 +81,31 @@ export async function setActiveChallenge(challengeId: string) {
 }
 
 export async function setChallengeArchivedStatus(challengeId: string, isArchived: boolean) {
-  const challenge = await prisma.challenge.findUnique({
-    where: { id: challengeId },
-    select: { isArchived: true },
-  });
+  await prisma.$transaction(async (tx) => {
+    const challenge = await tx.challenge.findUnique({
+      where: { id: challengeId },
+      select: { isArchived: true, isActive: true },
+    });
 
-  if (!challenge) {
-    throw new Error("Événement introuvable.");
-  }
+    if (!challenge) {
+      throw new Error("Événement introuvable.");
+    }
 
-  if (challenge.isArchived) {
-    throw new Error(ARCHIVED_READ_ONLY_MESSAGE);
-  }
+    if (isArchived) {
+      await tx.challenge.update({
+        where: { id: challengeId },
+        data: {
+          isActive: false,
+          isArchived: true,
+        },
+      });
+      return;
+    }
 
-  await prisma.challenge.update({
-    where: { id: challengeId },
-    data: {
-      isArchived,
-      ...(isArchived ? { isActive: false } : {}),
-    },
+    await tx.challenge.update({
+      where: { id: challengeId },
+      data: { isArchived: false },
+    });
   });
 }
 
