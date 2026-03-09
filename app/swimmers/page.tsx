@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
-import { DEFAULT_CHALLENGE_ID } from "@/lib/constants";
+import { ensureActiveChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { SwimmerCreateForm } from "./swimmer-create-form";
 
@@ -40,23 +40,6 @@ function formatErrorForServerLog(error: unknown) {
   return { value: error };
 }
 
-async function ensureDefaultChallenge() {
-  return prisma.challenge.upsert({
-    where: { id: DEFAULT_CHALLENGE_ID },
-    update: {},
-    create: {
-      id: DEFAULT_CHALLENGE_ID,
-      name: "Challenge Apnée V1",
-      eventDate: new Date(),
-      startTime: "09:30",
-      durationMinutes: 120,
-      roundsCount: 4,
-      lanes25Count: 4,
-      lanes50Count: 6,
-    },
-  });
-}
-
 type CreateSwimmerState = {
   error: string | null;
   success: boolean;
@@ -85,7 +68,7 @@ async function createSwimmer(_prevState: CreateSwimmerState, formData: FormData)
     };
   }
 
-  const challenge = await ensureDefaultChallenge();
+  const challenge = await ensureActiveChallenge();
   const fallbackNextNumber = await getNextSwimmerNumber(challenge.id);
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -252,7 +235,7 @@ export default async function SwimmersPage({
   }
 
   try {
-    const challenge = await ensureDefaultChallenge();
+    const challenge = await ensureActiveChallenge();
 
     const searchNumber = Number(query);
     const hasSearchNumber = !Number.isNaN(searchNumber);

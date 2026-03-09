@@ -10,25 +10,38 @@ async function main() {
   const lanes25Count = 4;
   const lanes50Count = 6;
 
-  const challenge = await prisma.challenge.upsert({
-    where: { id: "challenge-v1-default" },
-    update: {
+  let challenge = await prisma.challenge.findFirst({ where: { isActive: true } });
+
+  if (!challenge) {
+    challenge = await prisma.challenge.create({
+      data: {
+        name: "Challenge Apnée V1",
+        eventDate: new Date(),
+        startTime,
+        durationMinutes,
+        roundsCount,
+        lanes25Count,
+        lanes50Count,
+        isActive: true,
+      },
+    });
+  }
+
+  await prisma.challenge.update({
+    where: { id: challenge.id },
+    data: {
       startTime,
       durationMinutes,
       roundsCount,
       lanes25Count,
       lanes50Count,
+      isActive: true,
     },
-    create: {
-      id: "challenge-v1-default",
-      name: "Challenge Apnée V1",
-      eventDate: new Date(),
-      startTime,
-      durationMinutes,
-      roundsCount,
-      lanes25Count,
-      lanes50Count,
-    },
+  });
+
+  await prisma.challenge.updateMany({
+    where: { NOT: { id: challenge.id } },
+    data: { isActive: false },
   });
 
   await prisma.club.upsert({
