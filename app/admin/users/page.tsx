@@ -78,6 +78,13 @@ async function updateUser(formData: FormData) {
 
   if (!id || !firstName || !lastName || !email) return;
 
+  const existingUser = await prisma.user.findUnique({
+    where: { id },
+    select: { isSuperUser: true },
+  });
+
+  if (!existingUser) return;
+
   await prisma.user.update({
     where: { id },
     data: {
@@ -89,7 +96,7 @@ async function updateUser(formData: FormData) {
   });
 
   await prisma.challengeUser.deleteMany({ where: { userId: id } });
-  if (challengeIds.length > 0) {
+  if (!existingUser.isSuperUser && challengeIds.length > 0) {
     await prisma.challengeUser.createMany({
       data: challengeIds.map((challengeId) => ({ userId: id, challengeId })),
       skipDuplicates: true,
@@ -194,22 +201,28 @@ export default async function AdminUsersPage() {
                   <input name="email" defaultValue={user.email} required type="email" className="rounded border p-2" />
                   <input name="password" type="password" placeholder="Nouveau mot de passe (optionnel)" className="rounded border p-2" />
                 </div>
-                <div className="space-y-1 rounded border p-3">
-                  <p className="text-sm font-medium text-slate-700">Événements affiliés</p>
-                  <div className="grid gap-1">
-                    {challenges.map((challenge) => (
-                      <label key={challenge.id} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          name="challengeIds"
-                          value={challenge.id}
-                          defaultChecked={linkedChallengeIds.has(challenge.id)}
-                        />
-                        <span>{challenge.name}</span>
-                      </label>
-                    ))}
+                {user.isSuperUser ? (
+                  <p className="rounded border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                    Super utilisateur : accès à tous les événements.
+                  </p>
+                ) : (
+                  <div className="space-y-1 rounded border p-3">
+                    <p className="text-sm font-medium text-slate-700">Événements affiliés</p>
+                    <div className="grid gap-1">
+                      {challenges.map((challenge) => (
+                        <label key={challenge.id} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            name="challengeIds"
+                            value={challenge.id}
+                            defaultChecked={linkedChallengeIds.has(challenge.id)}
+                          />
+                          <span>{challenge.name}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
                 <p className="text-xs text-slate-500">
                   Affiliations actuelles :{" "}
                   {user.challenges.length > 0 ? user.challenges.map((link) => link.challenge.name).join(", ") : "Aucun événement"}
