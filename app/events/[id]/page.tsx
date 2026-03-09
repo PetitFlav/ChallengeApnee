@@ -2,7 +2,13 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { buildRoundDefinitions, regenerateEventStructure, sanitizeStartTime } from "@/lib/challenge";
-import { ARCHIVED_READ_ONLY_MESSAGE, assertChallengeWritable, setActiveChallenge } from "@/lib/events";
+import {
+  ARCHIVED_READ_ONLY_MESSAGE,
+  CLOSED_READ_ONLY_MESSAGE,
+  assertChallengeWritable,
+  closeChallenge,
+  setActiveChallenge,
+} from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_EVENT_TIMEZONE } from "@/lib/constants";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
@@ -57,6 +63,15 @@ async function saveEventConfiguration(formData: FormData) {
   try {
     await assertChallengeWritable(challengeId);
 
+    const challenge = await prisma.challenge.findUnique({
+      where: { id: challengeId },
+      select: { closedAt: true },
+    });
+
+    if (challenge?.closedAt) {
+      redirect(`/events/${challengeId}?error=closed`);
+    }
+
     await regenerateEventStructure(prisma, challengeId, {
       name,
       eventDate,
@@ -87,12 +102,40 @@ async function saveEventConfiguration(formData: FormData) {
   }
 }
 
+
+async function closeEvent(formData: FormData) {
+  "use server";
+
+  if (!hasDatabaseUrl) return;
+
+  const challengeId = String(formData.get("id") || "").trim();
+  if (!challengeId) return;
+
+  try {
+    await closeChallenge(challengeId);
+  } catch (error) {
+    if (error instanceof Error && error.message === ARCHIVED_READ_ONLY_MESSAGE) {
+      redirect(`/events/${challengeId}?error=archived`);
+    }
+    throw error;
+  }
+
+  revalidatePath(`/events/${challengeId}`);
+  revalidatePath("/events");
+  revalidatePath("/swimmers");
+  revalidatePath("/sheets/new");
+  revalidatePath("/dashboard");
+  revalidatePath("/public");
+
+  redirect(`/events/${challengeId}?message=closed`);
+}
+
 export default async function EventDetailPage({
   params,
   searchParams,
 }: {
   params: { id: string };
-  searchParams?: { error?: string };
+  searchParams?: { error?: string; message?: string };
 }) {
   if (!hasDatabaseUrl) {
     return (
@@ -119,12 +162,14 @@ export default async function EventDetailPage({
   const eventDate = challenge.eventDate.toISOString().slice(0, 10);
   const noLanesError = searchParams?.error === "no-lanes";
   const archivedError = searchParams?.error === "archived";
+  const closedError = searchParams?.error === "closed";
   const durationError = searchParams?.error === "duration";
   const roundsError = searchParams?.error === "rounds";
+  const closedMessage = searchParams?.message === "closed";
   const roundPreview =
     challenge.rounds.length > 0
       ? challenge.rounds.map((round) => ({ label: round.label, scheduledTime: round.scheduledTime }))
-      : buildRoundDefinitions(challenge.startTime, challenge.durationMinutes, challenge.roundsCount).map((round) => ({
+      : buildRoundDefinitions(challenge.startTime ?? "09:30", challenge.durationMinutes, challenge.roundsCount).map((round) => ({
           label: round.label,
           scheduledTime: round.scheduledTime,
         }));
@@ -141,48 +186,62 @@ export default async function EventDetailPage({
         <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
           {ARCHIVED_READ_ONLY_MESSAGE}
         </div>
+      ) : challenge.closedAt ? (
+        <div className="rounded border border-indigo-300 bg-indigo-50 p-3 text-sm text-indigo-800">
+          {CLOSED_READ_ONLY_MESSAGE}
+        </div>
       ) : null}
 
       {archivedError ? (
         <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">{ARCHIVED_READ_ONLY_MESSAGE}</div>
       ) : null}
 
+      {closedError ? (
+        <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">{CLOSED_READ_ONLY_MESSAGE}</div>
+      ) : null}
+
+      {closedMessage ? (
+        <div className="rounded border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">
+          Événement clôturé. Il est maintenant en consultation.
+        </div>
+      ) : null}
+
       <form action={saveEventConfiguration} className="grid gap-4 rounded border bg-white p-4 md:grid-cols-2">
         <input type="hidden" name="id" value={challenge.id} />
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Nom</span>
-          <input name="name" defaultValue={challenge.name} required disabled={challenge.isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+          <input name="name" defaultValue={challenge.name} required disabled={challenge.isArchived || Boolean(challenge.closedAt)} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Date</span>
-          <input type="date" name="eventDate" defaultValue={eventDate} required disabled={challenge.isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+          <input type="date" name="eventDate" defaultValue={eventDate} required disabled={challenge.isArchived || Boolean(challenge.closedAt)} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Heure de début</span>
-          <input type="time" name="startTime" defaultValue={challenge.startTime} required disabled={challenge.isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+          <input type="time" name="startTime" defaultValue={challenge.startTime ?? "09:30"} required disabled={challenge.isArchived || Boolean(challenge.closedAt)} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Fuseau horaire (IANA)</span>
-          <input name="timezone" defaultValue={challenge.timezone || DEFAULT_EVENT_TIMEZONE} required disabled={challenge.isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+          <input name="timezone" defaultValue={challenge.timezone || DEFAULT_EVENT_TIMEZONE} required disabled={challenge.isArchived || Boolean(challenge.closedAt)} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Durée (minutes)</span>
-          <input type="number" name="durationMinutes" min={2} defaultValue={challenge.durationMinutes} required disabled={challenge.isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+          <input type="number" name="durationMinutes" min={2} defaultValue={challenge.durationMinutes} required disabled={challenge.isArchived || Boolean(challenge.closedAt)} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Nombre de tournées</span>
-          <input type="number" name="roundsCount" min={1} defaultValue={challenge.roundsCount} required disabled={challenge.isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+          <input type="number" name="roundsCount" min={1} defaultValue={challenge.roundsCount} required disabled={challenge.isArchived || Boolean(challenge.closedAt)} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Nombre de lignes 25m</span>
-          <input type="number" name="lanes25Count" min={0} defaultValue={challenge.lanes25Count} required disabled={challenge.isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+          <input type="number" name="lanes25Count" min={0} defaultValue={challenge.lanes25Count} required disabled={challenge.isArchived || Boolean(challenge.closedAt)} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Nombre de lignes 50m</span>
-          <input type="number" name="lanes50Count" min={0} defaultValue={challenge.lanes50Count} required disabled={challenge.isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+          <input type="number" name="lanes50Count" min={0} defaultValue={challenge.lanes50Count} required disabled={challenge.isArchived || Boolean(challenge.closedAt)} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
         </label>
         <label className="flex items-center gap-2 md:col-span-2">
-          <input type="checkbox" name="isActive" defaultChecked={challenge.isActive} disabled={challenge.isArchived} />
+          <input type="checkbox" name="isActive" defaultChecked={challenge.isActive} disabled={challenge.isArchived || Boolean(challenge.closedAt)} />
           <span className="text-sm text-slate-700">Définir comme événement actif</span>
         </label>
 
@@ -216,9 +275,14 @@ export default async function EventDetailPage({
         </div>
 
         <div className="flex flex-wrap gap-2 md:col-span-2">
-          <button type="submit" disabled={challenge.isArchived} className="rounded bg-blue-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-slate-400">
+          <button type="submit" disabled={challenge.isArchived || Boolean(challenge.closedAt)} className="rounded bg-blue-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-slate-400">
             Enregistrer
           </button>
+          {!challenge.isArchived && !challenge.closedAt ? (
+            <button formAction={closeEvent} type="submit" className="rounded bg-indigo-600 px-4 py-2 text-white">
+              Clôturer l&apos;événement
+            </button>
+          ) : null}
           <Link href="/events" className="rounded border px-4 py-2 text-slate-700 hover:bg-slate-100">
             Retour à la liste des événements
           </Link>

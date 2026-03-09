@@ -15,6 +15,9 @@ export const ARCHIVED_ACTIVATION_ERROR =
 export const ARCHIVED_READ_ONLY_MESSAGE =
   "Attention : cet événement est archivé. Il est disponible en consultation uniquement.";
 
+export const CLOSED_READ_ONLY_MESSAGE =
+  "Attention : cet événement est clôturé. Il est disponible en consultation uniquement.";
+
 export const DELETE_EVENT_WARNING_MESSAGE =
   "Attention : cette action supprimera définitivement l’événement et toutes les données associées (tournées, lignes, feuilles, saisies, nageurs liés, résultats). Cette action est irréversible.";
 
@@ -132,6 +135,33 @@ export async function assertChallengeWritable(challengeId: string) {
   if (challenge.isArchived) {
     throw new Error(ARCHIVED_READ_ONLY_MESSAGE);
   }
+}
+
+export async function closeChallenge(challengeId: string) {
+  const challenge = await prisma.challenge.findUnique({
+    where: { id: challengeId },
+    select: { id: true, isArchived: true, closedAt: true },
+  });
+
+  if (!challenge) {
+    throw new Error("Événement introuvable.");
+  }
+
+  if (challenge.isArchived) {
+    throw new Error(ARCHIVED_READ_ONLY_MESSAGE);
+  }
+
+  if (challenge.closedAt) {
+    return challenge.closedAt;
+  }
+
+  const updated = await prisma.challenge.update({
+    where: { id: challengeId },
+    data: { closedAt: new Date() },
+    select: { closedAt: true },
+  });
+
+  return updated.closedAt;
 }
 
 export async function deleteChallengeCascade(challengeId: string) {

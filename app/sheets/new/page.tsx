@@ -1,6 +1,10 @@
 import { SheetStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import { ARCHIVED_READ_ONLY_MESSAGE, assertChallengeWritable, ensureActiveChallenge } from "@/lib/events";
+import {
+  ARCHIVED_READ_ONLY_MESSAGE,
+  CLOSED_READ_ONLY_MESSAGE,
+  ensureActiveChallenge,
+} from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { buildRoundAvailability } from "@/lib/rounds";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
@@ -166,6 +170,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
     startTime: challenge.startTime,
     timezone: challenge.timezone,
     durationMinutes: challenge.durationMinutes,
+    closedAt: challenge.closedAt,
   }).map((roundAvailability) => ({
     ...roundAvailability,
     opensAtLabel: toDisplayTimeLabel(roundAvailability.opensAt, challenge.timezone),
@@ -201,7 +206,40 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
   }
 
   try {
-    await assertChallengeWritable(challenge.id);
+    const latestChallenge = await prisma.challenge.findUnique({
+      where: { id: challenge.id },
+      select: { id: true, isArchived: true, closedAt: true },
+    });
+
+    if (!latestChallenge) {
+      return {
+        error: "Événement introuvable.",
+        success: null,
+        loadedSheetId: null,
+        nextRoundId: null,
+      };
+    }
+
+    if (latestChallenge.isArchived) {
+      return {
+        error: ARCHIVED_READ_ONLY_MESSAGE,
+        success: null,
+        loadedSheetId: null,
+        nextRoundId: null,
+      };
+    }
+
+    const lastRoundId = roundsWithProgress[roundsWithProgress.length - 1]?.id ?? null;
+    const canSaveAfterClosure = Boolean(latestChallenge.closedAt && roundId === lastRoundId);
+
+    if (latestChallenge.closedAt && !canSaveAfterClosure) {
+      return {
+        error: CLOSED_READ_ONLY_MESSAGE,
+        success: null,
+        loadedSheetId: null,
+        nextRoundId: null,
+      };
+    }
 
     const sheet = await prisma.$transaction(async (tx) => {
       const existingSheet = await tx.sheet.findFirst({
@@ -272,16 +310,18 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
 
     return {
       error: null,
-      success: shouldSwitchToActiveRound
-        ? "Les données de la tournée précédente ont bien été enregistrées. La saisie bascule maintenant sur la nouvelle tournée."
-        : "Feuille enregistrée avec succès.",
+      success: latestChallenge.closedAt
+        ? "Les données de la dernière tournée ont bien été enregistrées. L’événement est maintenant clôturé."
+        : shouldSwitchToActiveRound
+          ? "Les données de la tournée précédente ont bien été enregistrées. La saisie bascule maintenant sur la nouvelle tournée."
+          : "Feuille enregistrée avec succès.",
       loadedSheetId: sheet.id,
       nextRoundId: shouldSwitchToActiveRound ? activeRound?.id ?? null : null,
     };
   } catch (error) {
-    if (error instanceof Error && error.message === ARCHIVED_READ_ONLY_MESSAGE) {
+    if (error instanceof Error && (error.message === ARCHIVED_READ_ONLY_MESSAGE || error.message === CLOSED_READ_ONLY_MESSAGE)) {
       return {
-        error: ARCHIVED_READ_ONLY_MESSAGE,
+        error: error.message,
         success: null,
         loadedSheetId: null,
         nextRoundId: null,
@@ -313,6 +353,7 @@ export default async function NewSheetPage() {
   try {
     const challenge = await ensureActiveChallenge();
     const isArchived = challenge.isArchived;
+    const isClosed = Boolean(challenge.closedAt);
 
     const [rounds, lanes, swimmers, existingSheets] = await Promise.all([
       prisma.round.findMany({
@@ -368,6 +409,7 @@ export default async function NewSheetPage() {
       startTime: challenge.startTime,
       timezone: challenge.timezone,
       durationMinutes: challenge.durationMinutes,
+      closedAt: challenge.closedAt,
     }).map((roundAvailability) => ({
       ...roundAvailability,
       opensAtLabel: toDisplayTimeLabel(roundAvailability.opensAt, challenge.timezone),
@@ -382,6 +424,10 @@ export default async function NewSheetPage() {
         {isArchived ? (
           <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
             {ARCHIVED_READ_ONLY_MESSAGE}
+          </div>
+        ) : isClosed ? (
+          <div className="rounded border border-indigo-300 bg-indigo-50 p-3 text-sm text-indigo-800">
+            {CLOSED_READ_ONLY_MESSAGE}
           </div>
         ) : null}
         <NewSheetForm
@@ -406,7 +452,7 @@ export default async function NewSheetPage() {
             })),
           }))}
           action={saveSheet}
-          disabled={isArchived}
+          disabled={isArchived || isClosed}
         />
       </div>
     );

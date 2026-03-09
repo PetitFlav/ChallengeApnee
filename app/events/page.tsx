@@ -8,6 +8,7 @@ import {
   ARCHIVED_ACTIVATION_ERROR,
   ARCHIVED_READ_ONLY_MESSAGE,
   DELETE_EVENT_WARNING_MESSAGE,
+  closeChallenge,
   deleteChallengeCascade,
   ensureActiveChallenge,
   setActiveChallenge,
@@ -76,6 +77,32 @@ async function toggleArchiveEvent(formData: FormData) {
   revalidatePath("/sheets/new");
 }
 
+
+async function closeEvent(formData: FormData) {
+  "use server";
+
+  if (!hasDatabaseUrl) return;
+
+  const id = String(formData.get("id") || "").trim();
+  if (!id) return;
+
+  try {
+    await closeChallenge(id);
+  } catch (error) {
+    if (error instanceof Error && error.message === ARCHIVED_READ_ONLY_MESSAGE) {
+      redirect("/events?message=readonly");
+    }
+    throw error;
+  }
+
+  revalidatePath("/events");
+  revalidatePath("/dashboard");
+  revalidatePath("/swimmers");
+  revalidatePath("/sheets");
+  revalidatePath("/sheets/new");
+  revalidatePath("/public");
+}
+
 async function deleteEvent(formData: FormData) {
   "use server";
 
@@ -139,6 +166,7 @@ export default async function EventsPage({
         lanes50Count: true,
         isActive: true,
         isArchived: true,
+        closedAt: true,
       },
     }),
     prisma.sheetEntry.groupBy({
@@ -188,6 +216,12 @@ export default async function EventsPage({
         <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">{ACTIVE_DELETE_ERROR}</div>
       ) : null}
 
+      {searchParams?.message === "closed" ? (
+        <div className="rounded border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">
+          Événement clôturé. Il est maintenant en consultation.
+        </div>
+      ) : null}
+
       {searchParams?.message === "saved" ? (
         <div className="rounded border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">
           Événement enregistré. Retour sur la liste.
@@ -224,6 +258,8 @@ export default async function EventsPage({
                   <td className="p-3">
                     {event.isArchived ? (
                       <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">Archivé</span>
+                    ) : event.closedAt ? (
+                      <span className="rounded-full bg-indigo-100 px-2 py-1 text-xs font-medium text-indigo-800">Clôturé</span>
                     ) : event.isActive ? (
                       <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-800">Actif</span>
                     ) : (
@@ -246,6 +282,14 @@ export default async function EventsPage({
                             className="rounded bg-emerald-600 px-3 py-1 text-white"
                           >
                             Activer
+                          </button>
+                        </form>
+                      ) : null}
+                      {!event.isArchived && !event.closedAt ? (
+                        <form action={closeEvent}>
+                          <input type="hidden" name="id" value={event.id} />
+                          <button type="submit" className="rounded bg-indigo-600 px-3 py-1 text-white">
+                            Clôturer l&apos;événement
                           </button>
                         </form>
                       ) : null}

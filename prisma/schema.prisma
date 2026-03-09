@@ -23,6 +23,7 @@ model Challenge {
   lanes50Count    Int             @default(6)
   isActive        Boolean         @default(false)
   isArchived      Boolean         @default(false)
+  closedAt        DateTime?
   clubLinks       ChallengeClub[]
   lanes           Lane[]
   rounds          Round[]

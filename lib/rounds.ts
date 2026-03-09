@@ -11,6 +11,7 @@ type ChallengeTimeConfig = {
   startTime: string | null;
   timezone: string | null;
   durationMinutes: number;
+  closedAt?: Date | null;
 };
 
 export type RoundAvailability = {
@@ -131,7 +132,7 @@ export function buildRoundAvailability(
     const nextRound = orderedRounds[index + 1] ?? null;
     const closesAt = nextRound
       ? toUtcFromEventLocalDateTime(challenge.eventDate, nextRound.scheduledTime ?? challenge.startTime ?? "09:30", eventTimezone)
-      : endAt;
+      : challenge.closedAt ?? null;
 
     return {
       id: round.id,
@@ -142,7 +143,8 @@ export function buildRoundAvailability(
     };
   });
 
-  const currentlyOpenRound = computedRounds.find((round) => now >= round.opensAt && now < round.closesAt) ?? null;
+  const currentlyOpenRound =
+    computedRounds.find((round) => now >= round.opensAt && (!round.closesAt || now < round.closesAt)) ?? null;
   let blockReason: string | null = null;
 
   if (!currentlyOpenRound) {
@@ -153,7 +155,7 @@ export function buildRoundAvailability(
       blockReason = "Aucune tournée configurée.";
     } else if (now < firstRound.opensAt) {
       blockReason = `La saisie n'est pas encore ouverte (ouverture prévue à ${firstRound.opensAt.toISOString()}).`;
-    } else if (now >= lastRound.closesAt) {
+    } else if (lastRound.closesAt && now >= lastRound.closesAt) {
       blockReason = `La saisie est terminée (fermeture finale à ${lastRound.closesAt.toISOString()}).`;
     } else {
       blockReason = "Aucune tournée active trouvée pour l'heure courante (vérifier les horaires calculés des tournées).";
@@ -172,15 +174,15 @@ export function buildRoundAvailability(
       label: round.label,
       scheduledTime: round.scheduledTime,
       opensAt: round.opensAt.toISOString(),
-      closesAt: round.closesAt.toISOString(),
-      isOpenNow: now >= round.opensAt && now < round.closesAt,
+      closesAt: round.closesAt?.toISOString() ?? null,
+      isOpenNow: now >= round.opensAt && (!round.closesAt || now < round.closesAt),
     })),
     openRound: currentlyOpenRound
       ? {
           id: currentlyOpenRound.id,
           label: currentlyOpenRound.label,
           opensAt: currentlyOpenRound.opensAt.toISOString(),
-          closesAt: currentlyOpenRound.closesAt.toISOString(),
+          closesAt: currentlyOpenRound.closesAt?.toISOString() ?? null,
         }
       : null,
     blockingReason: blockReason,
@@ -190,7 +192,7 @@ export function buildRoundAvailability(
     const { opensAt, closesAt } = round;
 
     const isPending = now < opensAt;
-    const isClosed = now >= closesAt;
+    const isClosed = closesAt ? now >= closesAt : false;
 
     const status: RoundAvailability["status"] = isPending ? "pending" : isClosed ? "closed" : "active";
 
