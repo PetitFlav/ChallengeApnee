@@ -1,6 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { regenerateEventStructure, sanitizeStartTime } from "@/lib/challenge";
+import { buildRoundDefinitions, regenerateEventStructure, sanitizeStartTime } from "@/lib/challenge";
 import { setActiveChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 
@@ -30,9 +30,13 @@ async function saveEventConfiguration(formData: FormData) {
   const startTime = sanitizeStartTime(String(formData.get("startTime") || "09:30").trim());
   const durationMinutes = Math.max(30, Number.parseInt(String(formData.get("durationMinutes") || "120"), 10) || 120);
   const roundsCount = Math.max(1, Number.parseInt(String(formData.get("roundsCount") || "4"), 10) || 4);
-  const lanes25Count = Math.max(0, Number.parseInt(String(formData.get("lanes25Count") || "4"), 10) || 4);
-  const lanes50Count = Math.max(0, Number.parseInt(String(formData.get("lanes50Count") || "6"), 10) || 6);
+  const lanes25Count = Math.max(0, Number.parseInt(String(formData.get("lanes25Count") || "0"), 10) || 0);
+  const lanes50Count = Math.max(0, Number.parseInt(String(formData.get("lanes50Count") || "0"), 10) || 0);
   const shouldActivate = Boolean(formData.get("isActive"));
+
+  if (lanes25Count === 0 && lanes50Count === 0) {
+    redirect(`/events/${challengeId}?error=no-lanes`);
+  }
 
   const eventDate = eventDateRaw ? new Date(`${eventDateRaw}T00:00:00`) : new Date();
 
@@ -57,7 +61,13 @@ async function saveEventConfiguration(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
-export default async function EventDetailPage({ params }: { params: { id: string } }) {
+export default async function EventDetailPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams?: { error?: string };
+}) {
   if (!hasDatabaseUrl) {
     return (
       <div className="space-y-4">
@@ -69,10 +79,25 @@ export default async function EventDetailPage({ params }: { params: { id: string
     );
   }
 
-  const challenge = await prisma.challenge.findUnique({ where: { id: params.id } });
+  const challenge = await prisma.challenge.findUnique({
+    where: { id: params.id },
+    include: {
+      rounds: {
+        orderBy: { roundNumber: "asc" },
+      },
+    },
+  });
   if (!challenge) notFound();
 
   const eventDate = challenge.eventDate.toISOString().slice(0, 10);
+  const noLanesError = searchParams?.error === "no-lanes";
+  const roundPreview =
+    challenge.rounds.length > 0
+      ? challenge.rounds.map((round) => ({ label: round.label, scheduledTime: round.scheduledTime }))
+      : buildRoundDefinitions(challenge.startTime, challenge.durationMinutes, challenge.roundsCount).map((round) => ({
+          label: round.label,
+          scheduledTime: round.scheduledTime,
+        }));
 
   return (
     <div className="space-y-6">
@@ -115,6 +140,24 @@ export default async function EventDetailPage({ params }: { params: { id: string
           <input type="checkbox" name="isActive" defaultChecked={challenge.isActive} />
           <span className="text-sm text-slate-700">Définir comme événement actif</span>
         </label>
+
+        {noLanesError ? (
+          <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700 md:col-span-2">
+            Aucun bassin configuré. Renseignez au moins une ligne 25m ou 50m.
+          </div>
+        ) : null}
+
+        <div className="space-y-2 rounded border border-slate-200 bg-slate-50 p-3 text-sm md:col-span-2">
+          <p className="font-medium text-slate-700">Tournées configurées</p>
+          <ul className="space-y-1 text-slate-600">
+            {roundPreview.map((round) => (
+              <li key={round.label}>
+                {round.label} — {round.scheduledTime}
+              </li>
+            ))}
+          </ul>
+        </div>
+
         <div className="md:col-span-2">
           <button type="submit" className="rounded bg-blue-600 px-4 py-2 text-white">
             Enregistrer

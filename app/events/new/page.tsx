@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { regenerateEventStructure, sanitizeStartTime } from "@/lib/challenge";
+import { buildRoundDefinitions, regenerateEventStructure, sanitizeStartTime } from "@/lib/challenge";
 import { createDefaultEvent, setActiveChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 
@@ -26,9 +26,13 @@ async function createEvent(formData: FormData) {
   const startTime = sanitizeStartTime(String(formData.get("startTime") || "09:30").trim());
   const durationMinutes = Math.max(30, Number.parseInt(String(formData.get("durationMinutes") || "120"), 10) || 120);
   const roundsCount = Math.max(1, Number.parseInt(String(formData.get("roundsCount") || "4"), 10) || 4);
-  const lanes25Count = Math.max(0, Number.parseInt(String(formData.get("lanes25Count") || "4"), 10) || 4);
-  const lanes50Count = Math.max(0, Number.parseInt(String(formData.get("lanes50Count") || "6"), 10) || 6);
+  const lanes25Count = Math.max(0, Number.parseInt(String(formData.get("lanes25Count") || "0"), 10) || 0);
+  const lanes50Count = Math.max(0, Number.parseInt(String(formData.get("lanes50Count") || "0"), 10) || 0);
   const shouldActivate = Boolean(formData.get("isActive"));
+
+  if (lanes25Count === 0 && lanes50Count === 0) {
+    redirect("/events/new?error=no-lanes");
+  }
 
   const eventDate = eventDateRaw ? new Date(`${eventDateRaw}T00:00:00`) : new Date();
 
@@ -51,7 +55,7 @@ async function createEvent(formData: FormData) {
   redirect(`/events/${challenge.id}`);
 }
 
-export default function NewEventPage() {
+export default function NewEventPage({ searchParams }: { searchParams?: { error?: string } }) {
   if (!hasDatabaseUrl) {
     return (
       <div className="space-y-4">
@@ -62,6 +66,9 @@ export default function NewEventPage() {
       </div>
     );
   }
+
+  const roundPreview = buildRoundDefinitions("09:30", 120, 4);
+  const noLanesError = searchParams?.error === "no-lanes";
 
   return (
     <div className="space-y-6">
@@ -93,16 +100,34 @@ export default function NewEventPage() {
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Nombre de lignes 25m</span>
-          <input type="number" name="lanes25Count" min={0} defaultValue={4} required className="w-full rounded border p-2" />
+          <input type="number" name="lanes25Count" min={0} defaultValue={0} required className="w-full rounded border p-2" />
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Nombre de lignes 50m</span>
-          <input type="number" name="lanes50Count" min={0} defaultValue={6} required className="w-full rounded border p-2" />
+          <input type="number" name="lanes50Count" min={0} defaultValue={0} required className="w-full rounded border p-2" />
         </label>
         <label className="flex items-center gap-2 md:col-span-2">
           <input type="checkbox" name="isActive" defaultChecked />
           <span className="text-sm text-slate-700">Activer cet événement après création</span>
         </label>
+
+        {noLanesError ? (
+          <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700 md:col-span-2">
+            Aucun bassin configuré. Renseignez au moins une ligne 25m ou 50m.
+          </div>
+        ) : null}
+
+        <div className="space-y-2 rounded border border-slate-200 bg-slate-50 p-3 text-sm md:col-span-2">
+          <p className="font-medium text-slate-700">Tournées prévues (exemple)</p>
+          <ul className="space-y-1 text-slate-600">
+            {roundPreview.map((round) => (
+              <li key={round.roundNumber}>
+                {round.label} — {round.scheduledTime}
+              </li>
+            ))}
+          </ul>
+        </div>
+
         <div className="md:col-span-2">
           <button type="submit" className="rounded bg-blue-600 px-4 py-2 text-white">
             Créer

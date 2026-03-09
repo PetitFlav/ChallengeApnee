@@ -51,7 +51,10 @@ export function buildRoundDefinitions(startTime: string, durationMinutes: number
 
   return Array.from({ length: roundsCount }, (_, index) => {
     const roundNumber = index + 1;
-    const timeInMinutes = Math.round(startTotalMinutes + intervalMinutes * index);
+    const timeInMinutes =
+      roundNumber === roundsCount
+        ? startTotalMinutes + durationMinutes
+        : Math.round(startTotalMinutes + intervalMinutes * roundNumber);
     const hours = Math.floor(timeInMinutes / 60) % 24;
     const minutes = timeInMinutes % 60;
 
