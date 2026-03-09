@@ -22,11 +22,11 @@ model Challenge {
   lanes50Count    Int             @default(6)
   isActive        Boolean         @default(false)
   isArchived      Boolean         @default(false)
+  clubLinks       ChallengeClub[]
   lanes           Lane[]
   rounds          Round[]
   sheets          Sheet[]
   swimmers        Swimmer[]
-  clubLinks       ChallengeClub[]
 
   @@map("challenges")
 }
@@ -36,8 +36,8 @@ model Club {
   name       String          @unique
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
-  swimmers   Swimmer[]
   challenges ChallengeClub[]
+  swimmers   Swimmer[]
 
   @@map("clubs")
 }
@@ -48,12 +48,12 @@ model ChallengeClub {
   clubId      String
   isHostClub  Boolean   @default(false)
   createdAt   DateTime  @default(now())
+
   challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   club        Club      @relation(fields: [clubId], references: [id], onDelete: Cascade)
 
   @@unique([challengeId, clubId])
   @@index([challengeId])
-  @@index([challengeId, isHostClub])
   @@index([clubId])
   @@map("challenge_clubs")
 }
