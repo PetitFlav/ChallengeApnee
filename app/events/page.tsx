@@ -185,10 +185,6 @@ export default async function EventsPage({
         <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">{ACTIVE_DELETE_ERROR}</div>
       ) : null}
 
-      <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-        {ARCHIVED_READ_ONLY_MESSAGE}
-      </div>
-
       <div className="overflow-x-auto rounded border bg-white">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-100 text-left">
@@ -207,8 +203,6 @@ export default async function EventsPage({
           </thead>
           <tbody>
             {events.map((event) => {
-              const status = event.isArchived ? "Archivé" : event.isActive ? "Actif" : "Inactif";
-
               return (
                 <tr key={event.id} className="border-t align-top">
                   <td className="p-3 font-medium">{event.name}</td>
@@ -218,7 +212,15 @@ export default async function EventsPage({
                   <td className="p-3">{event.roundsCount}</td>
                   <td className="p-3">{event.lanes25Count}</td>
                   <td className="p-3">{event.lanes50Count}</td>
-                  <td className="p-3">{status}</td>
+                  <td className="p-3">
+                    {event.isArchived ? (
+                      <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">Archivé</span>
+                    ) : event.isActive ? (
+                      <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-800">Actif</span>
+                    ) : (
+                      <span className="rounded-full bg-slate-200 px-2 py-1 text-xs font-medium text-slate-700">Inactif</span>
+                    )}
+                  </td>
                   <td className="p-3">{(totals.get(event.id) ?? 0).toLocaleString("fr-FR")} m</td>
                   <td className="p-3">
                     <div className="flex flex-wrap gap-2">
