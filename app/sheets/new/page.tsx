@@ -2,6 +2,7 @@ import { SheetStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { ARCHIVED_READ_ONLY_MESSAGE, assertChallengeWritable, ensureActiveChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
+import { buildRoundAvailability } from "@/lib/rounds";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import { NewSheetForm } from "./new-sheet-form";
 
@@ -35,38 +36,12 @@ type RoundProgressOption = {
   label: string;
   status: "pending" | "active" | "closed";
   isSelectable: boolean;
+  opensAtLabel: string;
+  closesAtLabel: string;
 };
 
-function buildRoundProgress(
-  rounds: Array<{ id: string; label: string }>,
-  lanesCount: number,
-  sheets: Array<{ roundId: string }>,
-): RoundProgressOption[] {
-  const sheetsCountByRoundId = new Map<string, number>();
-
-  for (const sheet of sheets) {
-    sheetsCountByRoundId.set(sheet.roundId, (sheetsCountByRoundId.get(sheet.roundId) ?? 0) + 1);
-  }
-
-  const firstIncompleteRoundIndex = rounds.findIndex((round) => (sheetsCountByRoundId.get(round.id) ?? 0) < lanesCount);
-
-  return rounds.map((round, index) => {
-    const status: RoundProgressOption["status"] =
-      firstIncompleteRoundIndex === -1
-        ? "closed"
-        : index < firstIncompleteRoundIndex
-          ? "closed"
-          : index === firstIncompleteRoundIndex
-            ? "active"
-            : "pending";
-
-    return {
-      id: round.id,
-      label: round.label,
-      status,
-      isSelectable: status === "active",
-    };
-  });
+function toDisplayTimeLabel(value: Date) {
+  return value.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
 function parseEntries(entriesJson: string): CreateSheetEntryInput[] | null {
@@ -149,7 +124,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
     };
   }
 
-  const [round, lane, swimmers, rounds, lanesCount, sheetsForProgress] = await Promise.all([
+  const [round, lane, swimmers, rounds] = await Promise.all([
     prisma.round.findFirst({ where: { id: roundId, challengeId: challenge.id } }),
     prisma.lane.findFirst({ where: { id: laneId, challengeId: challenge.id } }),
     prisma.swimmer.findMany({
@@ -161,10 +136,8 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
     prisma.round.findMany({
       where: { challengeId: challenge.id },
       orderBy: [{ displayOrder: "asc" }, { roundNumber: "asc" }],
-      select: { id: true, label: true },
+      select: { id: true, label: true, scheduledTime: true },
     }),
-    prisma.lane.count({ where: { challengeId: challenge.id, isActive: true } }),
-    prisma.sheet.findMany({ where: { challengeId: challenge.id }, select: { roundId: true } }),
   ]);
 
   if (!round || !lane) {
@@ -175,7 +148,15 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
     };
   }
 
-  const roundsWithProgress = buildRoundProgress(rounds, lanesCount, sheetsForProgress);
+  const roundsWithProgress = buildRoundAvailability(rounds, {
+    eventDate: challenge.eventDate,
+    startTime: challenge.startTime,
+    durationMinutes: challenge.durationMinutes,
+  }).map((roundAvailability) => ({
+    ...roundAvailability,
+    opensAtLabel: toDisplayTimeLabel(roundAvailability.opensAt),
+    closesAtLabel: roundAvailability.closesAt ? toDisplayTimeLabel(roundAvailability.closesAt) : "-",
+  }));
   const activeRound = roundsWithProgress.find((candidateRound) => candidateRound.status === "active") ?? null;
 
   if (!activeRound || activeRound.id !== roundId) {
@@ -316,6 +297,7 @@ export default async function NewSheetPage() {
         select: {
           id: true,
           label: true,
+          scheduledTime: true,
         },
       }),
       prisma.lane.findMany({
@@ -357,7 +339,15 @@ export default async function NewSheetPage() {
       }),
     ]);
 
-    const roundsWithProgress = buildRoundProgress(rounds, lanes.length, existingSheets);
+    const roundsWithProgress = buildRoundAvailability(rounds, {
+      eventDate: challenge.eventDate,
+      startTime: challenge.startTime,
+      durationMinutes: challenge.durationMinutes,
+    }).map((roundAvailability) => ({
+      ...roundAvailability,
+      opensAtLabel: toDisplayTimeLabel(roundAvailability.opensAt),
+      closesAtLabel: roundAvailability.closesAt ? toDisplayTimeLabel(roundAvailability.closesAt) : "-",
+    }));
 
     return (
       <div className="space-y-4">

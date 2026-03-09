@@ -8,6 +8,8 @@ type RoundOption = {
   label: string;
   status: "pending" | "active" | "closed";
   isSelectable: boolean;
+  opensAtLabel: string;
+  closesAtLabel: string;
 };
 
 type LaneOption = {
@@ -172,9 +174,9 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
   }
 
   function getRoundOptionLabel(round: RoundOption) {
-    if (round.status === "active") return `${round.label} (en cours)`;
-    if (round.status === "closed") return `${round.label} (terminée)`;
-    return `${round.label} (à venir)`;
+    if (round.status === "active") return `${round.label} (ouverte ${round.opensAtLabel} → ${round.closesAtLabel})`;
+    if (round.status === "closed") return `${round.label} (fermée)`;
+    return `${round.label} (ouvrira à ${round.opensAtLabel})`;
   }
 
   return (
@@ -227,6 +229,15 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
       </div>
 
       {loadedMessage ? <p className="rounded border border-blue-200 bg-blue-50 p-2 text-sm text-blue-700">{loadedMessage}</p> : null}
+      {activeRound ? (
+        <p className="rounded border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-800">
+          Tournée ouverte actuellement : <strong>{activeRound.label}</strong> ({activeRound.opensAtLabel} → {activeRound.closesAtLabel}).
+        </p>
+      ) : (
+        <p className="rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">
+          Aucune tournée n’est ouverte à la saisie pour l’instant.
+        </p>
+      )}
       {roundSelectionMessage ? (
         <p className="rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-700">{roundSelectionMessage}</p>
       ) : null}
