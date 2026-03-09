@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { buildRoundDefinitions, regenerateEventStructure, sanitizeStartTime } from "@/lib/challenge";
@@ -62,6 +63,8 @@ async function saveEventConfiguration(formData: FormData) {
     revalidatePath("/swimmers");
     revalidatePath("/sheets/new");
     revalidatePath("/dashboard");
+
+    redirect("/events?message=saved");
   } catch (error) {
     if (error instanceof Error && error.message === ARCHIVED_READ_ONLY_MESSAGE) {
       redirect(`/events/${challengeId}?error=archived`);
@@ -178,10 +181,13 @@ export default async function EventDetailPage({
           </ul>
         </div>
 
-        <div className="md:col-span-2">
+        <div className="flex flex-wrap gap-2 md:col-span-2">
           <button type="submit" disabled={challenge.isArchived} className="rounded bg-blue-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-slate-400">
             Enregistrer
           </button>
+          <Link href="/events" className="rounded border px-4 py-2 text-slate-700 hover:bg-slate-100">
+            Retour à la liste des événements
+          </Link>
         </div>
       </form>
     </div>

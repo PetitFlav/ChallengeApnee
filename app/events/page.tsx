@@ -185,6 +185,12 @@ export default async function EventsPage({
         <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">{ACTIVE_DELETE_ERROR}</div>
       ) : null}
 
+      {searchParams?.message === "saved" ? (
+        <div className="rounded border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">
+          Événement enregistré. Retour sur la liste.
+        </div>
+      ) : null}
+
       <div className="overflow-x-auto rounded border bg-white">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-100 text-left">
@@ -229,18 +235,17 @@ export default async function EventsPage({
                       </Link>
                       {event.isActive ? (
                         <span className="rounded bg-emerald-100 px-3 py-1 text-emerald-800">Actif</span>
-                      ) : (
+                      ) : !event.isArchived ? (
                         <form action={activateEvent}>
                           <input type="hidden" name="id" value={event.id} />
                           <button
                             type="submit"
-                            disabled={event.isArchived}
-                            className="rounded bg-emerald-600 px-3 py-1 text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+                            className="rounded bg-emerald-600 px-3 py-1 text-white"
                           >
                             Activer
                           </button>
                         </form>
-                      )}
+                      ) : null}
                       <form action={toggleArchiveEvent}>
                         <input type="hidden" name="id" value={event.id} />
                         <input type="hidden" name="isArchived" value={String(event.isArchived)} />
