@@ -29,8 +29,38 @@ model Challenge {
   rounds          Round[]
   sheets          Sheet[]
   swimmers        Swimmer[]
+  userLinks       ChallengeUser[]
 
   @@map("challenges")
+}
+
+model User {
+  id           String          @id @default(cuid())
+  firstName    String
+  lastName     String
+  email        String          @unique
+  passwordHash String
+  isSuperUser  Boolean         @default(false)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  challenges   ChallengeUser[]
+
+  @@map("users")
+}
+
+model ChallengeUser {
+  id          String    @id @default(cuid())
+  userId      String
+  challengeId String
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, challengeId])
+  @@index([userId])
+  @@index([challengeId])
+  @@map("challenge_users")
 }
 
 model Club {
