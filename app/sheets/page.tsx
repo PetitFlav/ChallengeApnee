@@ -1,9 +1,11 @@
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import { LogoutButton } from "@/app/logout-button";
 import { requireSessionUser } from "@/lib/auth";
+import { requireActiveChallengeForUser } from "@/lib/access";
 
 export default async function SheetsPage() {
-  await requireSessionUser();
+  const user = await requireSessionUser();
+  await requireActiveChallengeForUser(user);
 
   return (
     <div className="space-y-4">

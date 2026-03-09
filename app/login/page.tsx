@@ -19,13 +19,13 @@ async function login(formData: FormData) {
   }
 
   await setSession(user.id);
-  redirect("/events");
+  redirect("/");
 }
 
 export default async function LoginPage({ searchParams }: { searchParams?: { error?: string } }) {
   const user = await getSessionUser();
   if (user) {
-    redirect("/events");
+    redirect("/");
   }
 
   return (

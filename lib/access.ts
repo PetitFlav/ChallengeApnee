@@ -6,6 +6,8 @@ type SessionUser = {
   isSuperUser: boolean;
 };
 
+export const NO_ACTIVE_CHALLENGE_ACCESS_MESSAGE = "Aucun événement actif ne vous est accessible actuellement.";
+
 export async function getUserAccessibleChallenges(user: SessionUser) {
   if (user.isSuperUser) {
     return prisma.challenge.findMany({
@@ -56,21 +58,25 @@ export async function ensureActiveChallengeForUser(user: SessionUser) {
     });
   }
 
-  const active = await prisma.challenge.findFirst({
+  return prisma.challenge.findFirst({
     where: {
       isActive: true,
       userLinks: { some: { userId: user.id } },
     },
     orderBy: { createdAt: "asc" },
   });
+}
 
-  if (active) return active;
+export async function requireSuperUser(user: SessionUser) {
+  if (!user.isSuperUser) {
+    redirect("/");
+  }
+}
 
-  return prisma.challenge.findFirst({
-    where: {
-      userLinks: { some: { userId: user.id } },
-      isArchived: false,
-    },
-    orderBy: { createdAt: "asc" },
-  });
+export async function requireActiveChallengeForUser(user: SessionUser) {
+  const challenge = await ensureActiveChallengeForUser(user);
+  if (!challenge) {
+    redirect("/?message=no-active-event");
+  }
+  return challenge;
 }

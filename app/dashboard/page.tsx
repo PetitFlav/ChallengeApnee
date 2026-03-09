@@ -1,5 +1,5 @@
 import { requireSessionUser } from "@/lib/auth";
-import { ensureActiveChallengeForUser } from "@/lib/access";
+import { requireActiveChallengeForUser } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 
@@ -31,10 +31,7 @@ export default async function DashboardPage() {
 
   try {
     const user = await requireSessionUser();
-    const challenge = await ensureActiveChallengeForUser(user);
-    if (!challenge) {
-      throw new Error("Aucun événement accessible pour cet utilisateur.");
-    }
+    const challenge = await requireActiveChallengeForUser(user);
 
     const [total, validatedSheetsCount] = await Promise.all([
       prisma.sheetEntry.aggregate({

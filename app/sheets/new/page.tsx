@@ -5,7 +5,7 @@ import {
   CLOSED_READ_ONLY_MESSAGE,
 } from "@/lib/events";
 import { requireSessionUser } from "@/lib/auth";
-import { ensureActiveChallengeForUser } from "@/lib/access";
+import { requireActiveChallengeForUser } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { buildRoundAvailability } from "@/lib/rounds";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
@@ -104,10 +104,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
   }
 
   const user = await requireSessionUser();
-  const challenge = await ensureActiveChallengeForUser(user);
-  if (!challenge) {
-    throw new Error("Aucun événement accessible pour cet utilisateur.");
-  }
+  const challenge = await requireActiveChallengeForUser(user);
   const roundId = String(formData.get("roundId") || "").trim();
   const laneId = String(formData.get("laneId") || "").trim();
   const entriesJson = String(formData.get("entriesJson") || "[]");
@@ -357,10 +354,7 @@ export default async function NewSheetPage() {
 
   try {
     const user = await requireSessionUser();
-  const challenge = await ensureActiveChallengeForUser(user);
-  if (!challenge) {
-    throw new Error("Aucun événement accessible pour cet utilisateur.");
-  }
+  const challenge = await requireActiveChallengeForUser(user);
     const isArchived = challenge.isArchived;
     const isClosed = Boolean(challenge.closedAt);
 
