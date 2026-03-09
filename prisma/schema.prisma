@@ -3,61 +3,49 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
-}
-
-enum SheetStatus {
-  DRAFT
-  VALIDATED
 }
 
 model Challenge {
   id              String    @id @default(cuid())
   name            String
   eventDate       DateTime
-  startTime       String    @default("09:30")
   durationMinutes Int       @default(120)
-  roundsCount     Int       @default(4)
-  lanes25Count    Int       @default(4)
-  lanes50Count    Int       @default(6)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
-
-  swimmers Swimmer[]
-  lanes    Lane[]
-  rounds   Round[]
-  sheets   Sheet[]
+  lanes           Lane[]
+  rounds          Round[]
+  sheets          Sheet[]
+  swimmers        Swimmer[]
 
   @@map("challenges")
 }
 
 model Club {
-  id         String   @id @default(cuid())
-  name       String   @unique
-  isHostClub Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  swimmers Swimmer[]
+  id         String    @id @default(cuid())
+  name       String    @unique
+  isHostClub Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  swimmers   Swimmer[]
 
   @@map("clubs")
 }
 
 model Section {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  swimmers Swimmer[]
+  id        String    @id @default(cuid())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  swimmers  Swimmer[]
 
   @@map("sections")
 }
 
 model Swimmer {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
   challengeId String
   number      Int
   firstName   String
@@ -65,13 +53,12 @@ model Swimmer {
   email       String
   clubId      String?
   sectionId   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  challenge Challenge   @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  club      Club?       @relation(fields: [clubId], references: [id], onDelete: SetNull)
-  section   Section?    @relation(fields: [sectionId], references: [id], onDelete: SetNull)
-  entries   SheetEntry[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  entries     SheetEntry[]
+  challenge   Challenge    @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  club        Club?        @relation(fields: [clubId], references: [id])
+  section     Section?     @relation(fields: [sectionId], references: [id])
 
   @@unique([challengeId, number])
   @@index([challengeId, number])
@@ -83,17 +70,16 @@ model Swimmer {
 }
 
 model Lane {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   challengeId  String
   code         String
   distanceM    Int
   displayOrder Int
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  sheets    Sheet[]
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  challenge    Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  sheets       Sheet[]
 
   @@unique([challengeId, code])
   @@index([challengeId, displayOrder])
@@ -101,17 +87,16 @@ model Lane {
 }
 
 model Round {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   challengeId   String
   roundNumber   Int
   label         String
   scheduledTime String?
   displayOrder  Int
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  sheets    Sheet[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  challenge     Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  sheets        Sheet[]
 
   @@unique([challengeId, roundNumber])
   @@index([challengeId, displayOrder])
@@ -119,20 +104,19 @@ model Round {
 }
 
 model Sheet {
-  id          String      @id @default(cuid())
+  id          String       @id @default(cuid())
   challengeId String
   roundId     String
   laneId      String
-  status      SheetStatus @default(DRAFT)
+  status      SheetStatus  @default(DRAFT)
   enteredBy   String?
   validatedAt DateTime?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-
-  challenge Challenge   @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  round     Round       @relation(fields: [roundId], references: [id], onDelete: Restrict)
-  lane      Lane        @relation(fields: [laneId], references: [id], onDelete: Restrict)
-  entries   SheetEntry[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  entries     SheetEntry[]
+  challenge   Challenge    @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  lane        Lane         @relation(fields: [laneId], references: [id])
+  round       Round        @relation(fields: [roundId], references: [id])
 
   @@unique([challengeId, roundId, laneId])
   @@index([challengeId, status])
@@ -151,12 +135,16 @@ model SheetEntry {
   distanceM    Int
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-
-  sheet   Sheet   @relation(fields: [sheetId], references: [id], onDelete: Cascade)
-  swimmer Swimmer @relation(fields: [swimmerId], references: [id], onDelete: Restrict)
+  sheet        Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  swimmer      Swimmer  @relation(fields: [swimmerId], references: [id])
 
   @@index([sheetId])
   @@index([swimmerId])
   @@index([sheetId, swimmerId])
   @@map("sheet_entries")
+}
+
+enum SheetStatus {
+  DRAFT
+  VALIDATED
 }
