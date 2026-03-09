@@ -16,6 +16,30 @@ const hasDatabaseUrl = (() => {
   }
 })();
 
+function isPrismaConnectivityError(error: unknown) {
+  if (error instanceof Prisma.PrismaClientInitializationError) {
+    return true;
+  }
+
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    return ["P1000", "P1001", "P1002", "P1017"].includes(error.code);
+  }
+
+  return false;
+}
+
+function formatErrorForServerLog(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  return { value: error };
+}
+
 async function ensureDefaultChallenge() {
   return prisma.challenge.upsert({
     where: { id: DEFAULT_CHALLENGE_ID },
@@ -423,12 +447,19 @@ export default async function SwimmersPage({
     </div>
   );
 
-  } catch {
+  } catch (error) {
+    console.error("[swimmers/page] Prisma read failed", formatErrorForServerLog(error));
+
+    const isConnectivityIssue = isPrismaConnectivityError(error);
+    const errorMessage = isConnectivityIssue
+      ? "Impossible de se connecter à la base de données. Vérifiez DATABASE_URL."
+      : "Une erreur est survenue lors du chargement des nageurs. Consultez les logs serveur.";
+
     return (
       <div className="space-y-4">
         <h1 className="text-3xl font-semibold">Nageurs</h1>
         <div className="rounded border border-amber-300 bg-amber-50 p-4 text-amber-800">
-          Impossible de se connecter à la base de données. Vérifiez DATABASE_URL.
+          {errorMessage}
         </div>
       </div>
     );
