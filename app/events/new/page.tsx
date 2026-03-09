@@ -25,11 +25,21 @@ async function createEvent(formData: FormData) {
   const name = String(formData.get("name") || "").trim() || "Challenge Apnée";
   const eventDateRaw = String(formData.get("eventDate") || "").trim();
   const startTime = sanitizeStartTime(String(formData.get("startTime") || "09:30").trim());
-  const durationMinutes = Math.max(30, Number.parseInt(String(formData.get("durationMinutes") || "120"), 10) || 120);
-  const roundsCount = Math.max(1, Number.parseInt(String(formData.get("roundsCount") || "4"), 10) || 4);
+  const parsedDurationMinutes = Number.parseInt(String(formData.get("durationMinutes") || "120"), 10);
+  const durationMinutes = Number.isNaN(parsedDurationMinutes) ? 120 : parsedDurationMinutes;
+  const parsedRoundsCount = Number.parseInt(String(formData.get("roundsCount") || "4"), 10);
+  const roundsCount = Number.isNaN(parsedRoundsCount) ? 4 : parsedRoundsCount;
   const lanes25Count = Math.max(0, Number.parseInt(String(formData.get("lanes25Count") || "0"), 10) || 0);
   const lanes50Count = Math.max(0, Number.parseInt(String(formData.get("lanes50Count") || "0"), 10) || 0);
   const shouldActivate = Boolean(formData.get("isActive"));
+
+  if (durationMinutes <= 1) {
+    redirect("/events/new?error=duration");
+  }
+
+  if (roundsCount < 1) {
+    redirect("/events/new?error=rounds");
+  }
 
   if (lanes25Count === 0 && lanes50Count === 0) {
     redirect("/events/new?error=no-lanes");
@@ -71,6 +81,8 @@ export default function NewEventPage({ searchParams }: { searchParams?: { error?
 
   const roundPreview = buildRoundDefinitions("09:30", 120, 4);
   const noLanesError = searchParams?.error === "no-lanes";
+  const durationError = searchParams?.error === "duration";
+  const roundsError = searchParams?.error === "rounds";
 
   return (
     <div className="space-y-6">
@@ -95,7 +107,7 @@ export default function NewEventPage({ searchParams }: { searchParams?: { error?
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Durée (minutes)</span>
-          <input type="number" name="durationMinutes" min={30} defaultValue={120} required className="w-full rounded border p-2" />
+          <input type="number" name="durationMinutes" min={2} defaultValue={120} required className="w-full rounded border p-2" />
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Nombre de tournées</span>
@@ -117,6 +129,18 @@ export default function NewEventPage({ searchParams }: { searchParams?: { error?
         {noLanesError ? (
           <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700 md:col-span-2">
             Aucun bassin configuré. Renseignez au moins une ligne 25m ou 50m.
+          </div>
+        ) : null}
+
+        {durationError ? (
+          <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700 md:col-span-2">
+            La durée doit être supérieure à 1 minute.
+          </div>
+        ) : null}
+
+        {roundsError ? (
+          <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700 md:col-span-2">
+            Le nombre de tournées doit être supérieur ou égal à 1.
           </div>
         ) : null}
 
