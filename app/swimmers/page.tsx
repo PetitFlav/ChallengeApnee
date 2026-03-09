@@ -237,13 +237,8 @@ async function createClub(formData: FormData) {
 
   const club = await prisma.club.upsert({
     where: { name },
-    update: {
-      ...(Boolean(formData.get("isHostClub")) ? { isHostClub: true } : {}),
-    },
-    create: {
-      name,
-      isHostClub: Boolean(formData.get("isHostClub")),
-    },
+    update: {},
+    create: { name },
   });
 
   await prisma.challengeClub.upsert({
@@ -257,6 +252,7 @@ async function createClub(formData: FormData) {
     create: {
       challengeId: challenge.id,
       clubId: club.id,
+      isHostClub: false,
     },
   });
 
@@ -279,6 +275,53 @@ async function deleteClub(formData: FormData) {
       },
     },
   });
+  revalidatePath("/swimmers");
+}
+
+
+async function toggleHostClub(formData: FormData) {
+  "use server";
+
+  if (!hasDatabaseUrl) return;
+
+  const challenge = await ensureActiveChallenge();
+  await assertChallengeWritable(challenge.id);
+
+  const clubId = String(formData.get("id") || "").trim();
+  const isHostClub = Boolean(formData.get("isHostClub"));
+  if (!clubId) return;
+
+  const participantClub = await prisma.challengeClub.findUnique({
+    where: {
+      challengeId_clubId: {
+        challengeId: challenge.id,
+        clubId,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (!participantClub) return;
+
+  await prisma.$transaction(async (tx) => {
+    if (isHostClub) {
+      await tx.challengeClub.updateMany({
+        where: { challengeId: challenge.id },
+        data: { isHostClub: false },
+      });
+    }
+
+    await tx.challengeClub.update({
+      where: {
+        challengeId_clubId: {
+          challengeId: challenge.id,
+          clubId,
+        },
+      },
+      data: { isHostClub },
+    });
+  });
+
   revalidatePath("/swimmers");
 }
 
@@ -368,6 +411,11 @@ export default async function SwimmersPage({
     ]);
 
     const clubs = challengeClubs.map(({ club }) => club);
+    const clubsWithHostFlag = challengeClubs.map((challengeClub) => ({
+      id: challengeClub.club.id,
+      name: challengeClub.club.name,
+      isHostClub: challengeClub.isHostClub,
+    }));
 
     const totalPages = Math.max(Math.ceil(swimmersCount / SWIMMERS_PER_PAGE), 1);
     const hasPreviousPage = currentPage > 1;
@@ -489,20 +537,31 @@ export default async function SwimmersPage({
           <h2 className="mb-3 text-xl font-medium">Clubs</h2>
           <form action={createClub} className="mb-3 flex gap-2">
             <input name="name" placeholder="Nouveau club" disabled={isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" required />
-            <label className="flex items-center gap-1 text-sm">
-              <input type="checkbox" name="isHostClub" disabled={isArchived} />
-              Host
-            </label>
             <button type="submit" disabled={isArchived} className="rounded bg-slate-800 px-3 text-white disabled:cursor-not-allowed disabled:bg-slate-400">
               +
             </button>
           </form>
           <ul className="space-y-2">
-            {clubs.map((club) => (
+            {clubsWithHostFlag.map((club) => (
               <li key={club.id} className="flex items-center justify-between rounded border p-2 text-sm">
-                <span>
-                  {club.name} {club.isHostClub ? "(organisateur)" : ""}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span>{club.name}</span>
+                  <form action={toggleHostClub} className="flex items-center gap-1">
+                    <input type="hidden" name="id" value={club.id} />
+                    <input
+                      type="checkbox"
+                      name="isHostClub"
+                      value="true"
+                      defaultChecked={club.isHostClub}
+                      disabled={isArchived}
+                    />
+                    <span className="text-xs text-slate-600">Club organisateur</span>
+                    <button type="submit" disabled={isArchived} className="rounded border px-2 py-0.5 text-xs disabled:cursor-not-allowed disabled:bg-slate-100">
+                      Appliquer
+                    </button>
+                  </form>
+                  {club.isHostClub ? <span className="text-xs font-medium text-emerald-700">(organisateur)</span> : null}
+                </div>
                 <form action={deleteClub}>
                   <input type="hidden" name="id" value={club.id} />
                   <button className="rounded bg-red-600 px-2 py-1 text-white disabled:cursor-not-allowed disabled:bg-slate-400" type="submit" disabled={isArchived}>

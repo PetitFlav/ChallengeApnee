@@ -46,8 +46,8 @@ async function main() {
 
   const hostClub = await prisma.club.upsert({
     where: { name: "Club Organisateur" },
-    update: { isHostClub: true },
-    create: { name: "Club Organisateur", isHostClub: true },
+    update: {},
+    create: { name: "Club Organisateur" },
   });
 
   const guestClubs = await Promise.all(
@@ -55,7 +55,7 @@ async function main() {
       prisma.club.upsert({
         where: { name },
         update: {},
-        create: { name, isHostClub: false },
+        create: { name },
       }),
     ),
   );
@@ -68,10 +68,13 @@ async function main() {
           clubId: club.id,
         },
       },
-      update: {},
+      update: {
+        isHostClub: club.id === hostClub.id,
+      },
       create: {
         challengeId: challenge.id,
         clubId: club.id,
+        isHostClub: club.id === hostClub.id,
       },
     });
   }

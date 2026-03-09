@@ -9,19 +9,19 @@ datasource db {
 }
 
 model Challenge {
-  id              String    @id @default(cuid())
+  id              String          @id @default(cuid())
   name            String
   eventDate       DateTime
-  durationMinutes Int       @default(120)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  durationMinutes Int             @default(120)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
   startTime       String?
   endTime         String?
-  roundsCount     Int       @default(4)
-  lanes25Count    Int       @default(4)
-  lanes50Count    Int       @default(6)
-  isActive        Boolean   @default(false)
-  isArchived      Boolean   @default(false)
+  roundsCount     Int             @default(4)
+  lanes25Count    Int             @default(4)
+  lanes50Count    Int             @default(6)
+  isActive        Boolean         @default(false)
+  isArchived      Boolean         @default(false)
   lanes           Lane[]
   rounds          Round[]
   sheets          Sheet[]
@@ -32,11 +32,10 @@ model Challenge {
 }
 
 model Club {
-  id         String    @id @default(cuid())
-  name       String    @unique
-  isHostClub Boolean   @default(false)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id         String          @id @default(cuid())
+  name       String          @unique
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
   swimmers   Swimmer[]
   challenges ChallengeClub[]
 
@@ -47,12 +46,14 @@ model ChallengeClub {
   id          String    @id @default(cuid())
   challengeId String
   clubId      String
+  isHostClub  Boolean   @default(false)
   createdAt   DateTime  @default(now())
   challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   club        Club      @relation(fields: [clubId], references: [id], onDelete: Cascade)
 
   @@unique([challengeId, clubId])
   @@index([challengeId])
+  @@index([challengeId, isHostClub])
   @@index([clubId])
   @@map("challenge_clubs")
 }
