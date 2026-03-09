@@ -8,6 +8,9 @@ import {
   DEFAULT_START_TIME,
 } from "@/lib/constants";
 
+export const ARCHIVED_ACTIVATION_ERROR =
+  "Attention : cet événement est archivé. Il doit d’abord être désarchivé avant de pouvoir être activé.";
+
 export async function createDefaultEvent(options?: { active?: boolean }) {
   return prisma.challenge.create({
     data: {
@@ -19,19 +22,21 @@ export async function createDefaultEvent(options?: { active?: boolean }) {
       lanes25Count: DEFAULT_LANES_25_COUNT,
       lanes50Count: DEFAULT_LANES_50_COUNT,
       isActive: options?.active ?? true,
+      isArchived: false,
     },
   });
 }
 
 export async function ensureActiveChallenge() {
   const active = await prisma.challenge.findFirst({
-    where: { isActive: true },
+    where: { isActive: true, isArchived: false },
     orderBy: { createdAt: "asc" },
   });
 
   if (active) return active;
 
   const firstChallenge = await prisma.challenge.findFirst({
+    where: { isArchived: false },
     orderBy: { createdAt: "asc" },
   });
 
@@ -47,6 +52,19 @@ export async function ensureActiveChallenge() {
 
 export async function setActiveChallenge(challengeId: string) {
   await prisma.$transaction(async (tx) => {
+    const challenge = await tx.challenge.findUnique({
+      where: { id: challengeId },
+      select: { id: true, isArchived: true },
+    });
+
+    if (!challenge) {
+      throw new Error("Événement introuvable.");
+    }
+
+    if (challenge.isArchived) {
+      throw new Error(ARCHIVED_ACTIVATION_ERROR);
+    }
+
     await tx.challenge.updateMany({
       where: { isActive: true, NOT: { id: challengeId } },
       data: { isActive: false },
@@ -56,5 +74,15 @@ export async function setActiveChallenge(challengeId: string) {
       where: { id: challengeId },
       data: { isActive: true },
     });
+  });
+}
+
+export async function setChallengeArchivedStatus(challengeId: string, isArchived: boolean) {
+  await prisma.challenge.update({
+    where: { id: challengeId },
+    data: {
+      isArchived,
+      ...(isArchived ? { isActive: false } : {}),
+    },
   });
 }

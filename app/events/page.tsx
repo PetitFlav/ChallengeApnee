@@ -1,6 +1,12 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { ensureActiveChallenge, setActiveChallenge } from "@/lib/events";
+import {
+  ARCHIVED_ACTIVATION_ERROR,
+  ensureActiveChallenge,
+  setActiveChallenge,
+  setChallengeArchivedStatus,
+} from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +30,14 @@ async function activateEvent(formData: FormData) {
   const id = String(formData.get("id") || "").trim();
   if (!id) return;
 
-  await setActiveChallenge(id);
+  try {
+    await setActiveChallenge(id);
+  } catch (error) {
+    if (error instanceof Error && error.message === ARCHIVED_ACTIVATION_ERROR) {
+      redirect("/events?message=archived");
+    }
+    throw error;
+  }
 
   revalidatePath("/events");
   revalidatePath("/dashboard");
@@ -32,7 +45,28 @@ async function activateEvent(formData: FormData) {
   revalidatePath("/sheets/new");
 }
 
-export default async function EventsPage() {
+async function toggleArchiveEvent(formData: FormData) {
+  "use server";
+
+  if (!hasDatabaseUrl) return;
+
+  const id = String(formData.get("id") || "").trim();
+  const currentValue = String(formData.get("isArchived") || "").trim();
+  if (!id) return;
+
+  await setChallengeArchivedStatus(id, currentValue !== "true");
+
+  revalidatePath("/events");
+  revalidatePath("/dashboard");
+  revalidatePath("/swimmers");
+  revalidatePath("/sheets/new");
+}
+
+export default async function EventsPage({
+  searchParams,
+}: {
+  searchParams?: { message?: string };
+}) {
   if (!hasDatabaseUrl) {
     return (
       <div className="space-y-4">
@@ -59,6 +93,7 @@ export default async function EventsPage() {
         lanes25Count: true,
         lanes50Count: true,
         isActive: true,
+        isArchived: true,
       },
     }),
     prisma.sheetEntry.groupBy({
@@ -80,12 +115,18 @@ export default async function EventsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-semibold">Événements</h1>
-          <p className="text-slate-600">Liste et activation des événements.</p>
+          <p className="text-slate-600">Liste, activation et archivage des événements.</p>
         </div>
         <Link href="/events/new" className="rounded bg-blue-600 px-4 py-2 text-white">
           Nouvel événement
         </Link>
       </div>
+
+      {searchParams?.message === "archived" ? (
+        <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          {ARCHIVED_ACTIVATION_ERROR}
+        </div>
+      ) : null}
 
       <div className="overflow-x-auto rounded border bg-white">
         <table className="min-w-full text-sm">
@@ -104,36 +145,47 @@ export default async function EventsPage() {
             </tr>
           </thead>
           <tbody>
-            {events.map((event) => (
-              <tr key={event.id} className="border-t align-top">
-                <td className="p-3 font-medium">{event.name}</td>
-                <td className="p-3">{event.eventDate.toLocaleDateString("fr-FR")}</td>
-                <td className="p-3">{event.startTime}</td>
-                <td className="p-3">{event.durationMinutes} min</td>
-                <td className="p-3">{event.roundsCount}</td>
-                <td className="p-3">{event.lanes25Count}</td>
-                <td className="p-3">{event.lanes50Count}</td>
-                <td className="p-3">{event.isActive ? "Actif" : "Inactif"}</td>
-                <td className="p-3">{(totals.get(event.id) ?? 0).toLocaleString("fr-FR")} m</td>
-                <td className="p-3">
-                  <div className="flex gap-2">
-                    <Link href={`/events/${event.id}`} className="rounded border px-3 py-1 hover:bg-slate-100">
-                      Ouvrir
-                    </Link>
-                    {!event.isActive ? (
-                      <form action={activateEvent}>
+            {events.map((event) => {
+              const status = event.isArchived ? "Archivé" : event.isActive ? "Actif" : "Inactif";
+
+              return (
+                <tr key={event.id} className="border-t align-top">
+                  <td className="p-3 font-medium">{event.name}</td>
+                  <td className="p-3">{event.eventDate.toLocaleDateString("fr-FR")}</td>
+                  <td className="p-3">{event.startTime}</td>
+                  <td className="p-3">{event.durationMinutes} min</td>
+                  <td className="p-3">{event.roundsCount}</td>
+                  <td className="p-3">{event.lanes25Count}</td>
+                  <td className="p-3">{event.lanes50Count}</td>
+                  <td className="p-3">{status}</td>
+                  <td className="p-3">{(totals.get(event.id) ?? 0).toLocaleString("fr-FR")} m</td>
+                  <td className="p-3">
+                    <div className="flex flex-wrap gap-2">
+                      <Link href={`/events/${event.id}`} className="rounded border px-3 py-1 hover:bg-slate-100">
+                        Ouvrir
+                      </Link>
+                      {!event.isActive ? (
+                        <form action={activateEvent}>
+                          <input type="hidden" name="id" value={event.id} />
+                          <button type="submit" className="rounded bg-emerald-600 px-3 py-1 text-white">
+                            Activer
+                          </button>
+                        </form>
+                      ) : (
+                        <span className="rounded bg-emerald-100 px-3 py-1 text-emerald-800">Actif</span>
+                      )}
+                      <form action={toggleArchiveEvent}>
                         <input type="hidden" name="id" value={event.id} />
-                        <button type="submit" className="rounded bg-emerald-600 px-3 py-1 text-white">
-                          Activer
+                        <input type="hidden" name="isArchived" value={String(event.isArchived)} />
+                        <button type="submit" className="rounded bg-slate-700 px-3 py-1 text-white">
+                          {event.isArchived ? "Désarchiver" : "Archiver"}
                         </button>
                       </form>
-                    ) : (
-                      <span className="rounded bg-emerald-100 px-3 py-1 text-emerald-800">Actif</span>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

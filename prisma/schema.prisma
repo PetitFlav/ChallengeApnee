@@ -21,6 +21,7 @@ model Challenge {
   lanes25Count    Int       @default(4)
   lanes50Count    Int       @default(6)
   isActive        Boolean   @default(false)
+  isArchived      Boolean   @default(false)
   lanes           Lane[]
   rounds          Round[]
   sheets          Sheet[]
