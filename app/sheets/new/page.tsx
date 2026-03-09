@@ -41,8 +41,12 @@ type RoundProgressOption = {
   closesAtLabel: string;
 };
 
-function toDisplayTimeLabel(value: Date) {
-  return value.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+function toDisplayTimeLabel(value: Date, timezone: string | null) {
+  return value.toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: timezone ?? "Europe/Paris",
+  });
 }
 
 function parseEntries(entriesJson: string): CreateSheetEntryInput[] | null {
@@ -161,8 +165,8 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
     durationMinutes: challenge.durationMinutes,
   }).map((roundAvailability) => ({
     ...roundAvailability,
-    opensAtLabel: toDisplayTimeLabel(roundAvailability.opensAt),
-    closesAtLabel: roundAvailability.closesAt ? toDisplayTimeLabel(roundAvailability.closesAt) : "-",
+    opensAtLabel: toDisplayTimeLabel(roundAvailability.opensAt, challenge.timezone),
+    closesAtLabel: roundAvailability.closesAt ? toDisplayTimeLabel(roundAvailability.closesAt, challenge.timezone) : "-",
   }));
   const submittedRound = roundsWithProgress.find((candidateRound) => candidateRound.id === roundId) ?? null;
 
@@ -363,8 +367,8 @@ export default async function NewSheetPage() {
       durationMinutes: challenge.durationMinutes,
     }).map((roundAvailability) => ({
       ...roundAvailability,
-      opensAtLabel: toDisplayTimeLabel(roundAvailability.opensAt),
-      closesAtLabel: roundAvailability.closesAt ? toDisplayTimeLabel(roundAvailability.closesAt) : "-",
+      opensAtLabel: toDisplayTimeLabel(roundAvailability.opensAt, challenge.timezone),
+      closesAtLabel: roundAvailability.closesAt ? toDisplayTimeLabel(roundAvailability.closesAt, challenge.timezone) : "-",
     }));
 
     return (
