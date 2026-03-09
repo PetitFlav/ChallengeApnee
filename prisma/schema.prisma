@@ -26,6 +26,7 @@ model Challenge {
   rounds          Round[]
   sheets          Sheet[]
   swimmers        Swimmer[]
+  clubLinks       ChallengeClub[]
 
   @@map("challenges")
 }
@@ -37,8 +38,23 @@ model Club {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   swimmers   Swimmer[]
+  challenges ChallengeClub[]
 
   @@map("clubs")
+}
+
+model ChallengeClub {
+  id          String    @id @default(cuid())
+  challengeId String
+  clubId      String
+  createdAt   DateTime  @default(now())
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  club        Club      @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, clubId])
+  @@index([challengeId])
+  @@index([clubId])
+  @@map("challenge_clubs")
 }
 
 model Section {

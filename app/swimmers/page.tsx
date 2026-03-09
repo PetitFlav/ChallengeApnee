@@ -72,6 +72,29 @@ async function createSwimmer(_prevState: CreateSwimmerState, formData: FormData)
   await assertChallengeWritable(challenge.id);
   const fallbackNextNumber = await getNextSwimmerNumber(challenge.id);
 
+  const clubId = String(formData.get("clubId") || "") || null;
+  const sectionId = String(formData.get("sectionId") || "") || null;
+
+  if (clubId) {
+    const participantClub = await prisma.challengeClub.findUnique({
+      where: {
+        challengeId_clubId: {
+          challengeId: challenge.id,
+          clubId,
+        },
+      },
+      select: { clubId: true },
+    });
+
+    if (!participantClub) {
+      return {
+        error: "Ce club n'est pas rattaché à l'événement actif.",
+        success: false,
+        nextNumber: fallbackNextNumber,
+      };
+    }
+  }
+
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const number = await getNextSwimmerNumber(challenge.id);
 
@@ -83,8 +106,8 @@ async function createSwimmer(_prevState: CreateSwimmerState, formData: FormData)
           firstName: String(formData.get("firstName") || "").trim(),
           lastName: String(formData.get("lastName") || "").trim(),
           email: String(formData.get("email") || "").trim(),
-          clubId: String(formData.get("clubId") || "") || null,
-          sectionId: String(formData.get("sectionId") || "") || null,
+          clubId,
+          sectionId,
         },
       });
 
@@ -125,13 +148,39 @@ async function updateSwimmer(formData: FormData) {
   const challenge = await ensureActiveChallenge();
   await assertChallengeWritable(challenge.id);
 
+  const swimmerId = String(formData.get("id") || "").trim();
+  if (!swimmerId) return;
+
+  const swimmer = await prisma.swimmer.findUnique({
+    where: { id: swimmerId },
+    select: { challengeId: true },
+  });
+
+  if (!swimmer || swimmer.challengeId !== challenge.id) return;
+
+  const clubId = String(formData.get("clubId") || "") || null;
+
+  if (clubId) {
+    const participantClub = await prisma.challengeClub.findUnique({
+      where: {
+        challengeId_clubId: {
+          challengeId: challenge.id,
+          clubId,
+        },
+      },
+      select: { clubId: true },
+    });
+
+    if (!participantClub) return;
+  }
+
   await prisma.swimmer.update({
-    where: { id: String(formData.get("id")) },
+    where: { id: swimmerId },
     data: {
       firstName: String(formData.get("firstName") || "").trim(),
       lastName: String(formData.get("lastName") || "").trim(),
       email: String(formData.get("email") || "").trim(),
-      clubId: String(formData.get("clubId") || "") || null,
+      clubId,
       sectionId: String(formData.get("sectionId") || "") || null,
     },
   });
@@ -185,10 +234,28 @@ async function createClub(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   if (!name) return;
 
-  await prisma.club.create({
-    data: {
+  const club = await prisma.club.upsert({
+    where: { name },
+    update: {
+      ...(Boolean(formData.get("isHostClub")) ? { isHostClub: true } : {}),
+    },
+    create: {
       name,
       isHostClub: Boolean(formData.get("isHostClub")),
+    },
+  });
+
+  await prisma.challengeClub.upsert({
+    where: {
+      challengeId_clubId: {
+        challengeId: challenge.id,
+        clubId: club.id,
+      },
+    },
+    update: {},
+    create: {
+      challengeId: challenge.id,
+      clubId: club.id,
     },
   });
 
@@ -203,7 +270,14 @@ async function deleteClub(formData: FormData) {
   const challenge = await ensureActiveChallenge();
   await assertChallengeWritable(challenge.id);
 
-  await prisma.club.delete({ where: { id: String(formData.get("id")) } });
+  await prisma.challengeClub.delete({
+    where: {
+      challengeId_clubId: {
+        challengeId: challenge.id,
+        clubId: String(formData.get("id")),
+      },
+    },
+  });
   revalidatePath("/swimmers");
 }
 
@@ -273,7 +347,7 @@ export default async function SwimmersPage({
         : {}),
     };
 
-    const [swimmers, swimmersCount, clubs, sections, nextSwimmerNumber] = await Promise.all([
+    const [swimmers, swimmersCount, challengeClubs, sections, nextSwimmerNumber] = await Promise.all([
       prisma.swimmer.findMany({
         where: searchFilter,
         include: { club: true, section: true },
@@ -282,10 +356,16 @@ export default async function SwimmersPage({
         take: SWIMMERS_PER_PAGE,
       }),
       prisma.swimmer.count({ where: searchFilter }),
-      prisma.club.findMany({ orderBy: { name: "asc" } }),
+      prisma.challengeClub.findMany({
+        where: { challengeId: challenge.id },
+        include: { club: true },
+        orderBy: { club: { name: "asc" } },
+      }),
       prisma.section.findMany({ orderBy: { name: "asc" } }),
       getNextSwimmerNumber(challenge.id),
     ]);
+
+    const clubs = challengeClubs.map(({ club }) => club);
 
     const totalPages = Math.max(Math.ceil(swimmersCount / SWIMMERS_PER_PAGE), 1);
     const hasPreviousPage = currentPage > 1;

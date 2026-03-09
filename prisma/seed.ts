@@ -44,13 +44,13 @@ async function main() {
     data: { isActive: false },
   });
 
-  await prisma.club.upsert({
+  const hostClub = await prisma.club.upsert({
     where: { name: "Club Organisateur" },
     update: { isHostClub: true },
     create: { name: "Club Organisateur", isHostClub: true },
   });
 
-  await Promise.all(
+  const guestClubs = await Promise.all(
     ["Club Exterieur A", "Club Exterieur B"].map((name) =>
       prisma.club.upsert({
         where: { name },
@@ -59,6 +59,22 @@ async function main() {
       }),
     ),
   );
+
+  for (const club of [hostClub, ...guestClubs]) {
+    await prisma.challengeClub.upsert({
+      where: {
+        challengeId_clubId: {
+          challengeId: challenge.id,
+          clubId: club.id,
+        },
+      },
+      update: {},
+      create: {
+        challengeId: challenge.id,
+        clubId: club.id,
+      },
+    });
+  }
 
   await Promise.all(
     ["Apnéistes", "Plongeurs", "Chasseurs", "Hockeyeurs"].map((name) =>
