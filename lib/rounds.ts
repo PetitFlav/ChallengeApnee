@@ -9,6 +9,7 @@ type RoundWindowInput = {
 type ChallengeTimeConfig = {
   eventDate: Date;
   startTime: string | null;
+  timezone: string | null;
   durationMinutes: number;
 };
 
@@ -21,21 +22,93 @@ export type RoundAvailability = {
   isSelectable: boolean;
 };
 
-function withClock(baseDate: Date, time: string) {
+const DEFAULT_EVENT_TIMEZONE = "Europe/Paris";
+
+function getEventTimezone(timezone: string | null | undefined) {
+  const candidate = timezone?.trim();
+  if (!candidate) return DEFAULT_EVENT_TIMEZONE;
+
+  try {
+    new Intl.DateTimeFormat("fr-FR", { timeZone: candidate });
+    return candidate;
+  } catch {
+    return DEFAULT_EVENT_TIMEZONE;
+  }
+}
+
+function getUtcDateParts(baseDate: Date) {
+  return {
+    year: baseDate.getUTCFullYear(),
+    month: baseDate.getUTCMonth() + 1,
+    day: baseDate.getUTCDate(),
+  };
+}
+
+function getTimeZoneOffsetMilliseconds(date: Date, timezone: string) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+
+  const parts = formatter.formatToParts(date);
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const asUtc = Date.UTC(
+    Number.parseInt(map.year, 10),
+    Number.parseInt(map.month, 10) - 1,
+    Number.parseInt(map.day, 10),
+    Number.parseInt(map.hour, 10),
+    Number.parseInt(map.minute, 10),
+    Number.parseInt(map.second, 10),
+  );
+
+  return asUtc - date.getTime();
+}
+
+function toUtcFromEventLocalDateTime(baseDate: Date, time: string, timezone: string) {
   const [hours, minutes] = sanitizeStartTime(time)
     .split(":")
     .map((value) => Number.parseInt(value, 10));
+  const { year, month, day } = getUtcDateParts(baseDate);
 
-  const composedDate = new Date(baseDate);
-  composedDate.setHours(hours, minutes, 0, 0);
-  return composedDate;
+  const utcGuess = Date.UTC(year, month - 1, day, hours, minutes, 0, 0);
+  const initialOffset = getTimeZoneOffsetMilliseconds(new Date(utcGuess), timezone);
+  let timestamp = utcGuess - initialOffset;
+  const adjustedOffset = getTimeZoneOffsetMilliseconds(new Date(timestamp), timezone);
+
+  if (adjustedOffset !== initialOffset) {
+    timestamp = utcGuess - adjustedOffset;
+  }
+
+  return new Date(timestamp);
+}
+
+function formatEventLocalDateTime(date: Date, timezone: string) {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: timezone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })
+    .format(date)
+    .replace(" ", "T");
 }
 
 export function getChallengeTimeRange(config: ChallengeTimeConfig) {
-  const startAt = withClock(config.eventDate, config.startTime ?? "09:30");
+  const eventTimezone = getEventTimezone(config.timezone);
+  const startAt = toUtcFromEventLocalDateTime(config.eventDate, config.startTime ?? "09:30", eventTimezone);
   const endAt = new Date(startAt.getTime() + config.durationMinutes * 60_000);
 
-  return { startAt, endAt };
+  return { startAt, endAt, eventTimezone };
 }
 
 export function buildRoundAvailability(
@@ -44,13 +117,20 @@ export function buildRoundAvailability(
   now: Date = new Date(),
 ): RoundAvailability[] {
   const orderedRounds = [...rounds];
-  const { startAt, endAt } = getChallengeTimeRange(challenge);
+  const { startAt, endAt, eventTimezone } = getChallengeTimeRange(challenge);
 
   const computedRounds = orderedRounds.map((round, index) => {
-    const opensAt = index === 0 ? startAt : withClock(challenge.eventDate, round.scheduledTime ?? challenge.startTime ?? "09:30");
+    const opensAt =
+      index === 0
+        ? startAt
+        : toUtcFromEventLocalDateTime(
+            challenge.eventDate,
+            round.scheduledTime ?? challenge.startTime ?? "09:30",
+            eventTimezone,
+          );
     const nextRound = orderedRounds[index + 1] ?? null;
     const closesAt = nextRound
-      ? withClock(challenge.eventDate, nextRound.scheduledTime ?? challenge.startTime ?? "09:30")
+      ? toUtcFromEventLocalDateTime(challenge.eventDate, nextRound.scheduledTime ?? challenge.startTime ?? "09:30", eventTimezone)
       : endAt;
 
     return {
@@ -62,7 +142,6 @@ export function buildRoundAvailability(
     };
   });
 
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const currentlyOpenRound = computedRounds.find((round) => now >= round.opensAt && now < round.closesAt) ?? null;
   let blockReason: string | null = null;
 
@@ -83,7 +162,8 @@ export function buildRoundAvailability(
 
   console.info("[Sheets][RoundOpeningDebug]", {
     now: now.toISOString(),
-    timezone,
+    timezone: eventTimezone,
+    eventLocalDateTime: formatEventLocalDateTime(startAt, eventTimezone),
     eventDate: challenge.eventDate.toISOString(),
     startTime: challenge.startTime ?? "09:30",
     endTime: endAt.toISOString(),

@@ -6,6 +6,7 @@ import {
   DEFAULT_LANES_50_COUNT,
   DEFAULT_ROUNDS_COUNT,
   DEFAULT_START_TIME,
+  DEFAULT_EVENT_TIMEZONE,
 } from "@/lib/constants";
 
 export const ARCHIVED_ACTIVATION_ERROR =
@@ -28,6 +29,7 @@ export async function createDefaultEvent(options?: { active?: boolean }) {
       name: DEFAULT_EVENT_NAME,
       eventDate: new Date(),
       startTime: DEFAULT_START_TIME,
+      timezone: DEFAULT_EVENT_TIMEZONE,
       durationMinutes: DEFAULT_DURATION_MINUTES,
       roundsCount: DEFAULT_ROUNDS_COUNT,
       lanes25Count: DEFAULT_LANES_25_COUNT,

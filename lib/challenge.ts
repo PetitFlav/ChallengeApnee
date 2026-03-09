@@ -4,6 +4,7 @@ export type EventConfigInput = {
   name: string;
   eventDate: Date;
   startTime: string;
+  timezone?: string;
   durationMinutes: number;
   roundsCount: number;
   lanes25Count: number;
@@ -78,6 +79,7 @@ export async function regenerateEventStructure(prisma: PrismaClient, challengeId
         name: config.name,
         eventDate: config.eventDate,
         startTime: sanitizeStartTime(config.startTime),
+        timezone: config.timezone?.trim() || "Europe/Paris",
         durationMinutes: config.durationMinutes,
         roundsCount: config.roundsCount,
         lanes25Count: config.lanes25Count,

@@ -151,6 +151,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
   const roundsWithProgress = buildRoundAvailability(rounds, {
     eventDate: challenge.eventDate,
     startTime: challenge.startTime,
+    timezone: challenge.timezone,
     durationMinutes: challenge.durationMinutes,
   }).map((roundAvailability) => ({
     ...roundAvailability,
@@ -342,6 +343,7 @@ export default async function NewSheetPage() {
     const roundsWithProgress = buildRoundAvailability(rounds, {
       eventDate: challenge.eventDate,
       startTime: challenge.startTime,
+      timezone: challenge.timezone,
       durationMinutes: challenge.durationMinutes,
     }).map((roundAvailability) => ({
       ...roundAvailability,

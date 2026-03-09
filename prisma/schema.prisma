@@ -16,6 +16,7 @@ model Challenge {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   startTime       String?
+  timezone        String          @default("Europe/Paris")
   endTime         String?
   roundsCount     Int             @default(4)
   lanes25Count    Int             @default(4)

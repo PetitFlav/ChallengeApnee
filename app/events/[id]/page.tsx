@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { buildRoundDefinitions, regenerateEventStructure, sanitizeStartTime } from "@/lib/challenge";
 import { ARCHIVED_READ_ONLY_MESSAGE, assertChallengeWritable, setActiveChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_EVENT_TIMEZONE } from "@/lib/constants";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ async function saveEventConfiguration(formData: FormData) {
   const name = String(formData.get("name") || "").trim() || "Challenge Apnée";
   const eventDateRaw = String(formData.get("eventDate") || "").trim();
   const startTime = sanitizeStartTime(String(formData.get("startTime") || "09:30").trim());
+  const timezone = String(formData.get("timezone") || DEFAULT_EVENT_TIMEZONE).trim() || DEFAULT_EVENT_TIMEZONE;
   const parsedDurationMinutes = Number.parseInt(String(formData.get("durationMinutes") || "120"), 10);
   const durationMinutes = Number.isNaN(parsedDurationMinutes) ? 120 : parsedDurationMinutes;
   const parsedRoundsCount = Number.parseInt(String(formData.get("roundsCount") || "4"), 10);
@@ -59,6 +61,7 @@ async function saveEventConfiguration(formData: FormData) {
       name,
       eventDate,
       startTime,
+      timezone,
       durationMinutes,
       roundsCount,
       lanes25Count,
@@ -157,6 +160,10 @@ export default async function EventDetailPage({
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Heure de début</span>
           <input type="time" name="startTime" defaultValue={challenge.startTime} required disabled={challenge.isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+        </label>
+        <label className="space-y-1">
+          <span className="text-sm font-medium text-slate-700">Fuseau horaire (IANA)</span>
+          <input name="timezone" defaultValue={challenge.timezone || DEFAULT_EVENT_TIMEZONE} required disabled={challenge.isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Durée (minutes)</span>
