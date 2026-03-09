@@ -23,6 +23,7 @@ type CreateSheetState = {
   error: string | null;
   success: string | null;
   loadedSheetId: string | null;
+  nextRoundId: string | null;
 };
 
 type CreateSheetEntryInput = {
@@ -86,6 +87,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
       error: "Base de données indisponible.",
       success: null,
       loadedSheetId: null,
+      nextRoundId: null,
     };
   }
 
@@ -99,6 +101,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
       error: "Sélectionnez une tournée et une ligne.",
       success: null,
       loadedSheetId: null,
+      nextRoundId: null,
     };
   }
 
@@ -109,6 +112,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
       error: "Ajoutez au moins une saisie nageur valide.",
       success: null,
       loadedSheetId: null,
+      nextRoundId: null,
     };
   }
 
@@ -121,6 +125,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
       error: "Un numéro de nageur ne peut apparaître qu'une fois sur une même feuille.",
       success: null,
       loadedSheetId: null,
+      nextRoundId: null,
     };
   }
 
@@ -145,6 +150,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
       error: "Tournée ou ligne introuvable.",
       success: null,
       loadedSheetId: null,
+      nextRoundId: null,
     };
   }
 
@@ -158,13 +164,14 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
     opensAtLabel: toDisplayTimeLabel(roundAvailability.opensAt),
     closesAtLabel: roundAvailability.closesAt ? toDisplayTimeLabel(roundAvailability.closesAt) : "-",
   }));
-  const activeRound = roundsWithProgress.find((candidateRound) => candidateRound.status === "active") ?? null;
+  const submittedRound = roundsWithProgress.find((candidateRound) => candidateRound.id === roundId) ?? null;
 
-  if (!activeRound || activeRound.id !== roundId) {
+  if (!submittedRound || submittedRound.status === "pending") {
     return {
-      error: "La tournée sélectionnée n'est pas ouverte à la saisie.",
+      error: "La tournée sélectionnée n'est pas encore ouverte à la saisie.",
       success: null,
       loadedSheetId: null,
+      nextRoundId: null,
     };
   }
 
@@ -182,6 +189,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
       error: `Nageur introuvable pour les numéros: ${missingSwimmerNumbers.join(", ")}.`,
       success: null,
       loadedSheetId: null,
+      nextRoundId: null,
     };
   }
 
@@ -252,10 +260,16 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
     revalidatePath("/sheets/new");
     revalidatePath("/dashboard");
 
+    const activeRound = roundsWithProgress.find((candidateRound) => candidateRound.status === "active") ?? null;
+    const shouldSwitchToActiveRound = Boolean(activeRound && activeRound.id !== roundId);
+
     return {
       error: null,
-      success: "Feuille enregistrée avec succès.",
+      success: shouldSwitchToActiveRound
+        ? "Les données de la tournée précédente ont bien été enregistrées. La saisie bascule maintenant sur la nouvelle tournée."
+        : "Feuille enregistrée avec succès.",
       loadedSheetId: sheet.id,
+      nextRoundId: shouldSwitchToActiveRound ? activeRound?.id ?? null : null,
     };
   } catch (error) {
     if (error instanceof Error && error.message === ARCHIVED_READ_ONLY_MESSAGE) {
@@ -263,6 +277,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
         error: ARCHIVED_READ_ONLY_MESSAGE,
         success: null,
         loadedSheetId: null,
+        nextRoundId: null,
       };
     }
 
@@ -270,6 +285,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
       error: "Impossible d'enregistrer la feuille. Vérifiez les données et réessayez.",
       success: null,
       loadedSheetId: null,
+      nextRoundId: null,
     };
   }
 }

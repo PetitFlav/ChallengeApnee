@@ -44,6 +44,7 @@ type CreateSheetState = {
   error: string | null;
   success: string | null;
   loadedSheetId: string | null;
+  nextRoundId: string | null;
 };
 
 type Props = {
@@ -62,7 +63,7 @@ const EMPTY_ROW: SheetRow = {
 };
 
 export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, disabled = false }: Props) {
-  const [state, formAction] = useFormState(action, { error: null, success: null, loadedSheetId: null });
+  const [state, formAction] = useFormState(action, { error: null, success: null, loadedSheetId: null, nextRoundId: null });
   const [roundId, setRoundId] = useState("");
   const [laneId, setLaneId] = useState("");
   const [rows, setRows] = useState<SheetRow[]>([EMPTY_ROW, EMPTY_ROW, EMPTY_ROW, EMPTY_ROW]);
@@ -140,6 +141,15 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
 
   useEffect(() => {
     if (!state.success) return;
+
+    if (state.nextRoundId) {
+      setRoundId(state.nextRoundId);
+      setLaneId("");
+      setRows([EMPTY_ROW, EMPTY_ROW, EMPTY_ROW, EMPTY_ROW]);
+      setLoadedMessage(null);
+      return;
+    }
+
     if (state.loadedSheetId) {
       setLoadedMessage("Feuille existante mise à jour avec succès.");
       return;
@@ -149,7 +159,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
     setLaneId("");
     setRows([EMPTY_ROW, EMPTY_ROW, EMPTY_ROW, EMPTY_ROW]);
     setLoadedMessage(null);
-  }, [state.loadedSheetId, state.success]);
+  }, [state.loadedSheetId, state.nextRoundId, state.success]);
 
   function updateRow(index: number, patch: Partial<SheetRow>) {
     setRows((previousRows) => previousRows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
