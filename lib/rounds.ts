@@ -46,13 +46,68 @@ export function buildRoundAvailability(
   const orderedRounds = [...rounds];
   const { startAt, endAt } = getChallengeTimeRange(challenge);
 
-  return orderedRounds.map((round, index) => {
+  const computedRounds = orderedRounds.map((round, index) => {
     const opensAt = index === 0 ? startAt : withClock(challenge.eventDate, round.scheduledTime ?? challenge.startTime ?? "09:30");
-
     const nextRound = orderedRounds[index + 1] ?? null;
     const closesAt = nextRound
       ? withClock(challenge.eventDate, nextRound.scheduledTime ?? challenge.startTime ?? "09:30")
       : endAt;
+
+    return {
+      id: round.id,
+      label: round.label,
+      scheduledTime: round.scheduledTime,
+      opensAt,
+      closesAt,
+    };
+  });
+
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const currentlyOpenRound = computedRounds.find((round) => now >= round.opensAt && now < round.closesAt) ?? null;
+  let blockReason: string | null = null;
+
+  if (!currentlyOpenRound) {
+    const firstRound = computedRounds[0] ?? null;
+    const lastRound = computedRounds[computedRounds.length - 1] ?? null;
+
+    if (!firstRound || !lastRound) {
+      blockReason = "Aucune tournée configurée.";
+    } else if (now < firstRound.opensAt) {
+      blockReason = `La saisie n'est pas encore ouverte (ouverture prévue à ${firstRound.opensAt.toISOString()}).`;
+    } else if (now >= lastRound.closesAt) {
+      blockReason = `La saisie est terminée (fermeture finale à ${lastRound.closesAt.toISOString()}).`;
+    } else {
+      blockReason = "Aucune tournée active trouvée pour l'heure courante (vérifier les horaires calculés des tournées).";
+    }
+  }
+
+  console.info("[Sheets][RoundOpeningDebug]", {
+    now: now.toISOString(),
+    timezone,
+    eventDate: challenge.eventDate.toISOString(),
+    startTime: challenge.startTime ?? "09:30",
+    endTime: endAt.toISOString(),
+    rounds: computedRounds.map((round) => ({
+      id: round.id,
+      label: round.label,
+      scheduledTime: round.scheduledTime,
+      opensAt: round.opensAt.toISOString(),
+      closesAt: round.closesAt.toISOString(),
+      isOpenNow: now >= round.opensAt && now < round.closesAt,
+    })),
+    openRound: currentlyOpenRound
+      ? {
+          id: currentlyOpenRound.id,
+          label: currentlyOpenRound.label,
+          opensAt: currentlyOpenRound.opensAt.toISOString(),
+          closesAt: currentlyOpenRound.closesAt.toISOString(),
+        }
+      : null,
+    blockingReason: blockReason,
+  });
+
+  return computedRounds.map((round) => {
+    const { opensAt, closesAt } = round;
 
     const isPending = now < opensAt;
     const isClosed = now >= closesAt;
