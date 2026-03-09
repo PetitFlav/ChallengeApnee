@@ -166,6 +166,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
   }
 
   const hasInProgressSheet = Boolean(roundId && laneId && normalizedRows.length > 0);
+  const isEntryLocked = disabled || !roundId || !laneId;
 
   function handleRoundChange(nextRoundId: string) {
     const targetRound = rounds.find((round) => round.id === nextRoundId);
@@ -217,7 +218,10 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
             name="laneId"
             disabled={disabled}
             value={laneId}
-            onChange={(event) => setLaneId(event.target.value)}
+            onChange={(event) => {
+              setLaneId(event.target.value);
+              setRoundSelectionMessage(null);
+            }}
             required
             className="w-full rounded border p-2"
           >
@@ -251,9 +255,14 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
       {roundSelectionMessage ? (
         <p className="rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-700">{roundSelectionMessage}</p>
       ) : null}
+      {!roundId || !laneId ? (
+        <p className="rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">
+          Choisissez d&apos;abord la tournée et le type de ligne pour déverrouiller la saisie des distances.
+        </p>
+      ) : null}
 
       <div className="overflow-x-auto rounded border">
-        <table className="min-w-full divide-y divide-slate-200 text-sm">
+        <table className={`min-w-full divide-y divide-slate-200 text-sm ${isEntryLocked ? "opacity-60" : ""}`}>
           <thead className="bg-slate-50">
             <tr>
               <th className="p-2 text-left">N°</th>
@@ -283,7 +292,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
                       inputMode="numeric"
                       min={1}
                       value={row.swimmerNumber}
-                      disabled={disabled}
+                      disabled={isEntryLocked}
                       onChange={(event) => updateRow(index, { swimmerNumber: event.target.value })}
                       className="w-20 rounded border p-1"
                     />
@@ -293,7 +302,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
                       inputMode="numeric"
                       min={0}
                       value={row.squares}
-                      disabled={disabled}
+                      disabled={isEntryLocked}
                       onChange={(event) => updateRow(index, { squares: event.target.value })}
                       className="w-20 rounded border p-1"
                     />
@@ -303,7 +312,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
                       inputMode="numeric"
                       min={0}
                       value={row.ticks}
-                      disabled={disabled}
+                      disabled={isEntryLocked}
                       onChange={(event) => updateRow(index, { ticks: event.target.value })}
                       className="w-20 rounded border p-1"
                     />
@@ -319,7 +328,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
                     <button
                       type="button"
                       onClick={() => setRows((previousRows) => previousRows.filter((_item, rowIndex) => rowIndex !== index))}
-                      disabled={disabled || rows.length <= 1}
+                      disabled={isEntryLocked || rows.length <= 1}
                       className="rounded bg-red-600 px-2 py-1 text-xs text-white disabled:cursor-not-allowed disabled:bg-slate-300"
                     >
                       Supprimer
@@ -337,7 +346,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
       <button
         type="button"
         onClick={() => setRows((previousRows) => [...previousRows, EMPTY_ROW])}
-        disabled={disabled}
+        disabled={isEntryLocked}
         className="rounded border border-slate-300 px-3 py-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
       >
         Ajouter une ligne nageur
@@ -354,7 +363,11 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
         <p className="rounded border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-700">{state.success}</p>
       ) : null}
 
-      <button type="submit" disabled={disabled} className="rounded bg-blue-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-slate-400">
+      <button
+        type="submit"
+        disabled={isEntryLocked}
+        className="rounded bg-blue-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+      >
         Enregistrer la feuille
       </button>
     </form>

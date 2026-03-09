@@ -7,6 +7,9 @@ import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import { NewSheetForm } from "./new-sheet-form";
 
 export const dynamic = "force-dynamic";
+export const metadata = {
+  title: "Saisie des distances",
+};
 
 const databaseUrl = process.env.DATABASE_URL;
 const hasDatabaseUrl = (() => {
@@ -299,7 +302,7 @@ export default async function NewSheetPage() {
     return (
       <div className="space-y-4">
         <BackToMainMenuLink />
-        <h1 className="text-3xl font-semibold">Nouvelle feuille</h1>
+        <h1 className="text-3xl font-semibold">Saisie des distances</h1>
         <div className="rounded border border-amber-300 bg-amber-50 p-4 text-amber-800">
           Définissez la variable DATABASE_URL pour activer la saisie des feuilles.
         </div>
@@ -374,8 +377,8 @@ export default async function NewSheetPage() {
     return (
       <div className="space-y-4">
         <BackToMainMenuLink />
-        <h1 className="text-3xl font-semibold">Nouvelle feuille</h1>
-        <p className="text-slate-600">Sélectionnez tournée + ligne, puis saisissez les nageurs.</p>
+        <h1 className="text-3xl font-semibold">Saisie des distances</h1>
+        <p className="text-slate-600">Choisissez d&apos;abord la tournée et la ligne, puis saisissez les nageurs.</p>
         {isArchived ? (
           <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
             {ARCHIVED_READ_ONLY_MESSAGE}
@@ -410,7 +413,7 @@ export default async function NewSheetPage() {
   } catch {
     return (
       <div className="space-y-4">
-        <h1 className="text-3xl font-semibold">Nouvelle feuille</h1>
+        <h1 className="text-3xl font-semibold">Saisie des distances</h1>
         <div className="rounded border border-amber-300 bg-amber-50 p-4 text-amber-800">
           Impossible de se connecter à la base de données. Vérifiez DATABASE_URL.
         </div>

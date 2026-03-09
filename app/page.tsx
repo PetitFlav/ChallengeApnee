@@ -4,7 +4,7 @@ const links = [
   ["/login", "Login"],
   ["/swimmers", "Nageurs"],
   ["/sheets", "Feuilles"],
-  ["/sheets/new", "Nouvelle feuille"],
+  ["/sheets/new", "Saisie des distances"],
   ["/dashboard", "Dashboard"],
   ["/events", "Événements"],
   ["/public", "Écran public"],
