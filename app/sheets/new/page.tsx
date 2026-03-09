@@ -1,6 +1,6 @@
 import { SheetStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import { ensureActiveChallenge } from "@/lib/events";
+import { ARCHIVED_READ_ONLY_MESSAGE, assertChallengeWritable, ensureActiveChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { NewSheetForm } from "./new-sheet-form";
 
@@ -146,6 +146,8 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
   }
 
   try {
+    await assertChallengeWritable(challenge.id);
+
     const sheet = await prisma.$transaction(async (tx) => {
       const existingSheet = await tx.sheet.findFirst({
         where: {
@@ -215,7 +217,15 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
       success: "Feuille enregistrée avec succès.",
       loadedSheetId: sheet.id,
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === ARCHIVED_READ_ONLY_MESSAGE) {
+      return {
+        error: ARCHIVED_READ_ONLY_MESSAGE,
+        success: null,
+        loadedSheetId: null,
+      };
+    }
+
     return {
       error: "Impossible d'enregistrer la feuille. Vérifiez les données et réessayez.",
       success: null,
@@ -238,6 +248,7 @@ export default async function NewSheetPage() {
 
   try {
     const challenge = await ensureActiveChallenge();
+    const isArchived = challenge.isArchived;
 
     const [rounds, lanes, swimmers, existingSheets] = await Promise.all([
       prisma.round.findMany({
@@ -291,6 +302,11 @@ export default async function NewSheetPage() {
       <div className="space-y-4">
         <h1 className="text-3xl font-semibold">Nouvelle feuille</h1>
         <p className="text-slate-600">Sélectionnez tournée + ligne, puis saisissez les nageurs.</p>
+        {isArchived ? (
+          <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+            {ARCHIVED_READ_ONLY_MESSAGE}
+          </div>
+        ) : null}
         <NewSheetForm
           rounds={rounds}
           lanes={lanes}
@@ -313,6 +329,7 @@ export default async function NewSheetPage() {
             })),
           }))}
           action={saveSheet}
+          disabled={isArchived}
         />
       </div>
     );

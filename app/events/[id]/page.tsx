@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { buildRoundDefinitions, regenerateEventStructure, sanitizeStartTime } from "@/lib/challenge";
-import { setActiveChallenge } from "@/lib/events";
+import { ARCHIVED_READ_ONLY_MESSAGE, assertChallengeWritable, setActiveChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -40,25 +40,34 @@ async function saveEventConfiguration(formData: FormData) {
 
   const eventDate = eventDateRaw ? new Date(`${eventDateRaw}T00:00:00`) : new Date();
 
-  await regenerateEventStructure(prisma, challengeId, {
-    name,
-    eventDate,
-    startTime,
-    durationMinutes,
-    roundsCount,
-    lanes25Count,
-    lanes50Count,
-  });
+  try {
+    await assertChallengeWritable(challengeId);
 
-  if (shouldActivate) {
-    await setActiveChallenge(challengeId);
+    await regenerateEventStructure(prisma, challengeId, {
+      name,
+      eventDate,
+      startTime,
+      durationMinutes,
+      roundsCount,
+      lanes25Count,
+      lanes50Count,
+    });
+
+    if (shouldActivate) {
+      await setActiveChallenge(challengeId);
+    }
+
+    revalidatePath(`/events/${challengeId}`);
+    revalidatePath("/events");
+    revalidatePath("/swimmers");
+    revalidatePath("/sheets/new");
+    revalidatePath("/dashboard");
+  } catch (error) {
+    if (error instanceof Error && error.message === ARCHIVED_READ_ONLY_MESSAGE) {
+      redirect(`/events/${challengeId}?error=archived`);
+    }
+    throw error;
   }
-
-  revalidatePath(`/events/${challengeId}`);
-  revalidatePath("/events");
-  revalidatePath("/swimmers");
-  revalidatePath("/sheets/new");
-  revalidatePath("/dashboard");
 }
 
 export default async function EventDetailPage({
@@ -91,6 +100,7 @@ export default async function EventDetailPage({
 
   const eventDate = challenge.eventDate.toISOString().slice(0, 10);
   const noLanesError = searchParams?.error === "no-lanes";
+  const archivedError = searchParams?.error === "archived";
   const roundPreview =
     challenge.rounds.length > 0
       ? challenge.rounds.map((round) => ({ label: round.label, scheduledTime: round.scheduledTime }))
@@ -106,38 +116,48 @@ export default async function EventDetailPage({
         <p className="text-slate-600">Modifiez puis régénérez lignes et tournées.</p>
       </div>
 
+      {challenge.isArchived ? (
+        <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          {ARCHIVED_READ_ONLY_MESSAGE}
+        </div>
+      ) : null}
+
+      {archivedError ? (
+        <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">{ARCHIVED_READ_ONLY_MESSAGE}</div>
+      ) : null}
+
       <form action={saveEventConfiguration} className="grid gap-4 rounded border bg-white p-4 md:grid-cols-2">
         <input type="hidden" name="id" value={challenge.id} />
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Nom</span>
-          <input name="name" defaultValue={challenge.name} required className="w-full rounded border p-2" />
+          <input name="name" defaultValue={challenge.name} required disabled={challenge.isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Date</span>
-          <input type="date" name="eventDate" defaultValue={eventDate} required className="w-full rounded border p-2" />
+          <input type="date" name="eventDate" defaultValue={eventDate} required disabled={challenge.isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Heure de début</span>
-          <input type="time" name="startTime" defaultValue={challenge.startTime} required className="w-full rounded border p-2" />
+          <input type="time" name="startTime" defaultValue={challenge.startTime} required disabled={challenge.isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Durée (minutes)</span>
-          <input type="number" name="durationMinutes" min={30} defaultValue={challenge.durationMinutes} required className="w-full rounded border p-2" />
+          <input type="number" name="durationMinutes" min={30} defaultValue={challenge.durationMinutes} required disabled={challenge.isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Nombre de tournées</span>
-          <input type="number" name="roundsCount" min={1} defaultValue={challenge.roundsCount} required className="w-full rounded border p-2" />
+          <input type="number" name="roundsCount" min={1} defaultValue={challenge.roundsCount} required disabled={challenge.isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Nombre de lignes 25m</span>
-          <input type="number" name="lanes25Count" min={0} defaultValue={challenge.lanes25Count} required className="w-full rounded border p-2" />
+          <input type="number" name="lanes25Count" min={0} defaultValue={challenge.lanes25Count} required disabled={challenge.isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
         </label>
         <label className="space-y-1">
           <span className="text-sm font-medium text-slate-700">Nombre de lignes 50m</span>
-          <input type="number" name="lanes50Count" min={0} defaultValue={challenge.lanes50Count} required className="w-full rounded border p-2" />
+          <input type="number" name="lanes50Count" min={0} defaultValue={challenge.lanes50Count} required disabled={challenge.isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
         </label>
         <label className="flex items-center gap-2 md:col-span-2">
-          <input type="checkbox" name="isActive" defaultChecked={challenge.isActive} />
+          <input type="checkbox" name="isActive" defaultChecked={challenge.isActive} disabled={challenge.isArchived} />
           <span className="text-sm text-slate-700">Définir comme événement actif</span>
         </label>
 
@@ -159,7 +179,7 @@ export default async function EventDetailPage({
         </div>
 
         <div className="md:col-span-2">
-          <button type="submit" className="rounded bg-blue-600 px-4 py-2 text-white">
+          <button type="submit" disabled={challenge.isArchived} className="rounded bg-blue-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-slate-400">
             Enregistrer
           </button>
         </div>

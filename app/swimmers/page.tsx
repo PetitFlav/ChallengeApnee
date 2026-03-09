@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
-import { ensureActiveChallenge } from "@/lib/events";
+import { ARCHIVED_READ_ONLY_MESSAGE, assertChallengeWritable, ensureActiveChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { SwimmerCreateForm } from "./swimmer-create-form";
 
@@ -69,6 +69,7 @@ async function createSwimmer(_prevState: CreateSwimmerState, formData: FormData)
   }
 
   const challenge = await ensureActiveChallenge();
+  await assertChallengeWritable(challenge.id);
   const fallbackNextNumber = await getNextSwimmerNumber(challenge.id);
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -121,6 +122,9 @@ async function updateSwimmer(formData: FormData) {
 
   if (!hasDatabaseUrl) return;
 
+  const challenge = await ensureActiveChallenge();
+  await assertChallengeWritable(challenge.id);
+
   await prisma.swimmer.update({
     where: { id: String(formData.get("id")) },
     data: {
@@ -139,6 +143,9 @@ async function deleteSwimmer(formData: FormData) {
   "use server";
 
   if (!hasDatabaseUrl) return;
+
+  const challenge = await ensureActiveChallenge();
+  await assertChallengeWritable(challenge.id);
 
   const swimmerId = String(formData.get("id") || "").trim();
   if (!swimmerId) return;
@@ -172,6 +179,9 @@ async function createClub(formData: FormData) {
 
   if (!hasDatabaseUrl) return;
 
+  const challenge = await ensureActiveChallenge();
+  await assertChallengeWritable(challenge.id);
+
   const name = String(formData.get("name") || "").trim();
   if (!name) return;
 
@@ -190,6 +200,9 @@ async function deleteClub(formData: FormData) {
 
   if (!hasDatabaseUrl) return;
 
+  const challenge = await ensureActiveChallenge();
+  await assertChallengeWritable(challenge.id);
+
   await prisma.club.delete({ where: { id: String(formData.get("id")) } });
   revalidatePath("/swimmers");
 }
@@ -198,6 +211,9 @@ async function createSection(formData: FormData) {
   "use server";
 
   if (!hasDatabaseUrl) return;
+
+  const challenge = await ensureActiveChallenge();
+  await assertChallengeWritable(challenge.id);
 
   const name = String(formData.get("name") || "").trim();
   if (!name) return;
@@ -210,6 +226,9 @@ async function deleteSection(formData: FormData) {
   "use server";
 
   if (!hasDatabaseUrl) return;
+
+  const challenge = await ensureActiveChallenge();
+  await assertChallengeWritable(challenge.id);
 
   await prisma.section.delete({ where: { id: String(formData.get("id")) } });
   revalidatePath("/swimmers");
@@ -236,6 +255,7 @@ export default async function SwimmersPage({
 
   try {
     const challenge = await ensureActiveChallenge();
+    const isArchived = challenge.isArchived;
 
     const searchNumber = Number(query);
     const hasSearchNumber = !Number.isNaN(searchNumber);
@@ -282,6 +302,12 @@ export default async function SwimmersPage({
     <div className="space-y-8">
       <h1 className="text-3xl font-semibold">Nageurs</h1>
 
+      {isArchived ? (
+        <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          {ARCHIVED_READ_ONLY_MESSAGE}
+        </div>
+      ) : null}
+
       <section className="rounded border bg-white p-4">
         <h2 className="mb-3 text-xl font-medium">Créer un nageur</h2>
         <SwimmerCreateForm
@@ -289,6 +315,7 @@ export default async function SwimmersPage({
           sections={sections}
           defaultNumber={nextSwimmerNumber}
           action={createSwimmer}
+          disabled={isArchived}
         />
       </section>
 
@@ -302,7 +329,7 @@ export default async function SwimmersPage({
               placeholder="Recherche #, nom, prénom"
               className="rounded border p-2"
             />
-            <button type="submit" className="rounded bg-slate-800 px-3 text-white">
+            <button type="submit" disabled={isArchived} className="rounded bg-slate-800 px-3 text-white disabled:cursor-not-allowed disabled:bg-slate-400">
               Rechercher
             </button>
           </form>
@@ -317,10 +344,10 @@ export default async function SwimmersPage({
                 aria-label="Numéro"
                 className="rounded border bg-slate-100 p-2 text-slate-700"
               />
-              <input name="firstName" defaultValue={swimmer.firstName} required className="rounded border p-2" />
-              <input name="lastName" defaultValue={swimmer.lastName} required className="rounded border p-2" />
-              <input name="email" type="email" defaultValue={swimmer.email} required className="rounded border p-2" />
-              <select name="clubId" defaultValue={swimmer.clubId ?? ""} className="rounded border p-2">
+              <input name="firstName" defaultValue={swimmer.firstName} required disabled={isArchived} className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+              <input name="lastName" defaultValue={swimmer.lastName} required disabled={isArchived} className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+              <input name="email" type="email" defaultValue={swimmer.email} required disabled={isArchived} className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+              <select name="clubId" defaultValue={swimmer.clubId ?? ""} disabled={isArchived} className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100">
                 <option value="">Sans club</option>
                 {clubs.map((club) => (
                   <option key={club.id} value={club.id}>
@@ -328,7 +355,7 @@ export default async function SwimmersPage({
                   </option>
                 ))}
               </select>
-              <select name="sectionId" defaultValue={swimmer.sectionId ?? ""} className="rounded border p-2">
+              <select name="sectionId" defaultValue={swimmer.sectionId ?? ""} disabled={isArchived} className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100">
                 <option value="">Sans section</option>
                 {sections.map((section) => (
                   <option key={section.id} value={section.id}>
@@ -336,13 +363,13 @@ export default async function SwimmersPage({
                   </option>
                 ))}
               </select>
-              <button type="submit" className="rounded bg-emerald-600 px-3 py-2 text-white">
+              <button type="submit" disabled={isArchived} className="rounded bg-emerald-600 px-3 py-2 text-white disabled:cursor-not-allowed disabled:bg-slate-400">
                 Enregistrer
               </button>
               <button
                 formAction={deleteSwimmer}
                 type="submit"
-                className="rounded bg-red-600 px-3 py-2 text-white"
+                className="rounded bg-red-600 px-3 py-2 text-white disabled:cursor-not-allowed disabled:bg-slate-400" disabled={isArchived}
               >
                 Supprimer
               </button>
@@ -378,12 +405,12 @@ export default async function SwimmersPage({
         <div className="rounded border bg-white p-4">
           <h2 className="mb-3 text-xl font-medium">Clubs</h2>
           <form action={createClub} className="mb-3 flex gap-2">
-            <input name="name" placeholder="Nouveau club" className="w-full rounded border p-2" required />
+            <input name="name" placeholder="Nouveau club" disabled={isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" required />
             <label className="flex items-center gap-1 text-sm">
-              <input type="checkbox" name="isHostClub" />
+              <input type="checkbox" name="isHostClub" disabled={isArchived} />
               Host
             </label>
-            <button type="submit" className="rounded bg-slate-800 px-3 text-white">
+            <button type="submit" disabled={isArchived} className="rounded bg-slate-800 px-3 text-white disabled:cursor-not-allowed disabled:bg-slate-400">
               +
             </button>
           </form>
@@ -395,7 +422,7 @@ export default async function SwimmersPage({
                 </span>
                 <form action={deleteClub}>
                   <input type="hidden" name="id" value={club.id} />
-                  <button className="rounded bg-red-600 px-2 py-1 text-white" type="submit">
+                  <button className="rounded bg-red-600 px-2 py-1 text-white disabled:cursor-not-allowed disabled:bg-slate-400" type="submit" disabled={isArchived}>
                     Supprimer
                   </button>
                 </form>
@@ -406,8 +433,8 @@ export default async function SwimmersPage({
         <div className="rounded border bg-white p-4">
           <h2 className="mb-3 text-xl font-medium">Sections</h2>
           <form action={createSection} className="mb-3 flex gap-2">
-            <input name="name" placeholder="Nouvelle section" className="w-full rounded border p-2" required />
-            <button type="submit" className="rounded bg-slate-800 px-3 text-white">
+            <input name="name" placeholder="Nouvelle section" disabled={isArchived} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" required />
+            <button type="submit" disabled={isArchived} className="rounded bg-slate-800 px-3 text-white disabled:cursor-not-allowed disabled:bg-slate-400">
               +
             </button>
           </form>
@@ -417,7 +444,7 @@ export default async function SwimmersPage({
                 <span>{section.name}</span>
                 <form action={deleteSection}>
                   <input type="hidden" name="id" value={section.id} />
-                  <button className="rounded bg-red-600 px-2 py-1 text-white" type="submit">
+                  <button className="rounded bg-red-600 px-2 py-1 text-white disabled:cursor-not-allowed disabled:bg-slate-400" type="submit" disabled={isArchived}>
                     Supprimer
                   </button>
                 </form>

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
   ARCHIVED_ACTIVATION_ERROR,
+  ARCHIVED_READ_ONLY_MESSAGE,
   ensureActiveChallenge,
   setActiveChallenge,
   setChallengeArchivedStatus,
@@ -54,7 +55,14 @@ async function toggleArchiveEvent(formData: FormData) {
   const currentValue = String(formData.get("isArchived") || "").trim();
   if (!id) return;
 
-  await setChallengeArchivedStatus(id, currentValue !== "true");
+  try {
+    await setChallengeArchivedStatus(id, currentValue !== "true");
+  } catch (error) {
+    if (error instanceof Error && error.message === ARCHIVED_READ_ONLY_MESSAGE) {
+      redirect("/events?message=readonly");
+    }
+    throw error;
+  }
 
   revalidatePath("/events");
   revalidatePath("/dashboard");
@@ -128,6 +136,16 @@ export default async function EventsPage({
         </div>
       ) : null}
 
+      {searchParams?.message === "readonly" ? (
+        <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          {ARCHIVED_READ_ONLY_MESSAGE}
+        </div>
+      ) : null}
+
+      <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+        {ARCHIVED_READ_ONLY_MESSAGE}
+      </div>
+
       <div className="overflow-x-auto rounded border bg-white">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-100 text-left">
@@ -164,23 +182,27 @@ export default async function EventsPage({
                       <Link href={`/events/${event.id}`} className="rounded border px-3 py-1 hover:bg-slate-100">
                         Ouvrir
                       </Link>
-                      {!event.isActive ? (
-                        <form action={activateEvent}>
+                      {!event.isArchived ? (
+                        !event.isActive ? (
+                          <form action={activateEvent}>
+                            <input type="hidden" name="id" value={event.id} />
+                            <button type="submit" className="rounded bg-emerald-600 px-3 py-1 text-white">
+                              Activer
+                            </button>
+                          </form>
+                        ) : (
+                          <span className="rounded bg-emerald-100 px-3 py-1 text-emerald-800">Actif</span>
+                        )
+                      ) : null}
+                      {!event.isArchived ? (
+                        <form action={toggleArchiveEvent}>
                           <input type="hidden" name="id" value={event.id} />
-                          <button type="submit" className="rounded bg-emerald-600 px-3 py-1 text-white">
-                            Activer
+                          <input type="hidden" name="isArchived" value={String(event.isArchived)} />
+                          <button type="submit" className="rounded bg-slate-700 px-3 py-1 text-white">
+                            Archiver
                           </button>
                         </form>
-                      ) : (
-                        <span className="rounded bg-emerald-100 px-3 py-1 text-emerald-800">Actif</span>
-                      )}
-                      <form action={toggleArchiveEvent}>
-                        <input type="hidden" name="id" value={event.id} />
-                        <input type="hidden" name="isArchived" value={String(event.isArchived)} />
-                        <button type="submit" className="rounded bg-slate-700 px-3 py-1 text-white">
-                          {event.isArchived ? "Désarchiver" : "Archiver"}
-                        </button>
-                      </form>
+                      ) : null}
                     </div>
                   </td>
                 </tr>

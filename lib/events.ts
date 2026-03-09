@@ -11,6 +11,9 @@ import {
 export const ARCHIVED_ACTIVATION_ERROR =
   "Attention : cet événement est archivé. Il doit d’abord être désarchivé avant de pouvoir être activé.";
 
+export const ARCHIVED_READ_ONLY_MESSAGE =
+  "Attention : cet événement est archivé. Il est disponible en consultation uniquement.";
+
 export async function createDefaultEvent(options?: { active?: boolean }) {
   return prisma.challenge.create({
     data: {
@@ -78,6 +81,19 @@ export async function setActiveChallenge(challengeId: string) {
 }
 
 export async function setChallengeArchivedStatus(challengeId: string, isArchived: boolean) {
+  const challenge = await prisma.challenge.findUnique({
+    where: { id: challengeId },
+    select: { isArchived: true },
+  });
+
+  if (!challenge) {
+    throw new Error("Événement introuvable.");
+  }
+
+  if (challenge.isArchived) {
+    throw new Error(ARCHIVED_READ_ONLY_MESSAGE);
+  }
+
   await prisma.challenge.update({
     where: { id: challengeId },
     data: {
@@ -85,4 +101,19 @@ export async function setChallengeArchivedStatus(challengeId: string, isArchived
       ...(isArchived ? { isActive: false } : {}),
     },
   });
+}
+
+export async function assertChallengeWritable(challengeId: string) {
+  const challenge = await prisma.challenge.findUnique({
+    where: { id: challengeId },
+    select: { isArchived: true },
+  });
+
+  if (!challenge) {
+    throw new Error("Événement introuvable.");
+  }
+
+  if (challenge.isArchived) {
+    throw new Error(ARCHIVED_READ_ONLY_MESSAGE);
+  }
 }

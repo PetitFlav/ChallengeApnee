@@ -14,9 +14,10 @@ type Props = {
   sections: Array<{ id: string; name: string }>;
   defaultNumber: number;
   action: (state: CreateSwimmerState, formData: FormData) => Promise<CreateSwimmerState>;
+  disabled?: boolean;
 };
 
-export function SwimmerCreateForm({ clubs, sections, defaultNumber, action }: Props) {
+export function SwimmerCreateForm({ clubs, sections, defaultNumber, action, disabled = false }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction] = useFormState(action, {
     error: null,
@@ -45,10 +46,10 @@ export function SwimmerCreateForm({ clubs, sections, defaultNumber, action }: Pr
         aria-label="Prochain numéro"
         className="rounded border bg-slate-100 p-2 text-slate-700"
       />
-      <input name="firstName" placeholder="Prénom" required className="rounded border p-2" />
-      <input name="lastName" placeholder="Nom" required className="rounded border p-2" />
-      <input name="email" type="email" placeholder="Email" required className="rounded border p-2" />
-      <select name="clubId" className="rounded border p-2">
+      <input name="firstName" disabled={disabled} placeholder="Prénom" required className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+      <input name="lastName" disabled={disabled} placeholder="Nom" required className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+      <input name="email" disabled={disabled} type="email" placeholder="Email" required className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+      <select name="clubId" disabled={disabled} className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100">
         <option value="">Sans club</option>
         {clubs.map((club) => (
           <option key={club.id} value={club.id}>
@@ -56,7 +57,7 @@ export function SwimmerCreateForm({ clubs, sections, defaultNumber, action }: Pr
           </option>
         ))}
       </select>
-      <select name="sectionId" className="rounded border p-2">
+      <select name="sectionId" disabled={disabled} className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100">
         <option value="">Sans section</option>
         {sections.map((section) => (
           <option key={section.id} value={section.id}>
@@ -69,7 +70,7 @@ export function SwimmerCreateForm({ clubs, sections, defaultNumber, action }: Pr
         <p className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700 md:col-span-6">{state.error}</p>
       ) : null}
 
-      <button type="submit" className="rounded bg-blue-600 p-2 text-white md:col-span-6">
+      <button type="submit" disabled={disabled} className="rounded bg-blue-600 p-2 text-white md:col-span-6 disabled:cursor-not-allowed disabled:bg-slate-400">
         Ajouter
       </button>
     </form>

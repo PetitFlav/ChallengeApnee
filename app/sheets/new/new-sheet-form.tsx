@@ -48,6 +48,7 @@ type Props = {
   swimmers: SwimmerOption[];
   existingSheets: ExistingSheet[];
   action: (state: CreateSheetState, formData: FormData) => Promise<CreateSheetState>;
+  disabled?: boolean;
 };
 
 const EMPTY_ROW: SheetRow = {
@@ -56,7 +57,7 @@ const EMPTY_ROW: SheetRow = {
   ticks: "",
 };
 
-export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action }: Props) {
+export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, disabled = false }: Props) {
   const [state, formAction] = useFormState(action, { error: null, success: null, loadedSheetId: null });
   const [roundId, setRoundId] = useState("");
   const [laneId, setLaneId] = useState("");
@@ -147,6 +148,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action }
           <span className="text-sm font-medium text-slate-700">Tournée</span>
           <select
             name="roundId"
+            disabled={disabled}
             value={roundId}
             onChange={(event) => setRoundId(event.target.value)}
             required
@@ -165,6 +167,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action }
           <span className="text-sm font-medium text-slate-700">Ligne</span>
           <select
             name="laneId"
+            disabled={disabled}
             value={laneId}
             onChange={(event) => setLaneId(event.target.value)}
             required
@@ -220,6 +223,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action }
                       inputMode="numeric"
                       min={1}
                       value={row.swimmerNumber}
+                      disabled={disabled}
                       onChange={(event) => updateRow(index, { swimmerNumber: event.target.value })}
                       className="w-20 rounded border p-1"
                     />
@@ -229,6 +233,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action }
                       inputMode="numeric"
                       min={0}
                       value={row.squares}
+                      disabled={disabled}
                       onChange={(event) => updateRow(index, { squares: event.target.value })}
                       className="w-20 rounded border p-1"
                     />
@@ -238,6 +243,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action }
                       inputMode="numeric"
                       min={0}
                       value={row.ticks}
+                      disabled={disabled}
                       onChange={(event) => updateRow(index, { ticks: event.target.value })}
                       className="w-20 rounded border p-1"
                     />
@@ -253,7 +259,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action }
                     <button
                       type="button"
                       onClick={() => setRows((previousRows) => previousRows.filter((_item, rowIndex) => rowIndex !== index))}
-                      disabled={rows.length <= 1}
+                      disabled={disabled || rows.length <= 1}
                       className="rounded bg-red-600 px-2 py-1 text-xs text-white disabled:cursor-not-allowed disabled:bg-slate-300"
                     >
                       Supprimer
@@ -271,7 +277,8 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action }
       <button
         type="button"
         onClick={() => setRows((previousRows) => [...previousRows, EMPTY_ROW])}
-        className="rounded border border-slate-300 px-3 py-2"
+        disabled={disabled}
+        className="rounded border border-slate-300 px-3 py-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
       >
         Ajouter une ligne nageur
       </button>
@@ -287,7 +294,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action }
         <p className="rounded border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-700">{state.success}</p>
       ) : null}
 
-      <button type="submit" className="rounded bg-blue-600 px-4 py-2 text-white">
+      <button type="submit" disabled={disabled} className="rounded bg-blue-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-slate-400">
         Enregistrer la feuille
       </button>
     </form>
