@@ -246,3 +246,32 @@ Exemple cible :
 ```bash
 npm install
 npm run dev
+
+## Login simple (V1)
+
+Cette version ajoute un login email + mot de passe avec session HTTP-only.
+
+### Pré-requis
+
+- Définir `AUTH_SECRET` (chaîne aléatoire) dans `.env`.
+- Exécuter les migrations Prisma (`npx prisma migrate dev`).
+
+### Créer un utilisateur de test
+
+```bash
+TEST_USER_EMAIL=admin@example.com \
+TEST_USER_PASSWORD='ChangeMe123!' \
+TEST_USER_FIRST_NAME='Admin' \
+TEST_USER_LAST_NAME='Challenge' \
+TEST_USER_CHALLENGE_ID='<challengeId>' \
+npm run user:create
+```
+
+- Si `TEST_USER_CHALLENGE_ID` est défini, l’utilisateur est affilié à cet événement.
+- Si besoin, passez `isSuperUser=true` directement en base pour donner l’accès à tous les événements.
+
+### Flux
+
+- `/login` : connexion email + mot de passe.
+- Bouton **Se déconnecter** : suppression de session.
+- Les pages métier sont protégées côté serveur et filtrées selon les événements autorisés.

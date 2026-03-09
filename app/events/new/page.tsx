@@ -4,6 +4,7 @@ import { createDefaultEvent, setActiveChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_EVENT_TIMEZONE } from "@/lib/constants";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
+import { requireSessionUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,8 @@ async function createEvent(formData: FormData) {
   "use server";
 
   if (!hasDatabaseUrl) return;
+
+  await requireSessionUser();
 
   const name = String(formData.get("name") || "").trim() || "Challenge Apnée";
   const eventDateRaw = String(formData.get("eventDate") || "").trim();
@@ -69,7 +72,7 @@ async function createEvent(formData: FormData) {
   redirect(`/events/${challenge.id}`);
 }
 
-export default function NewEventPage({ searchParams }: { searchParams?: { error?: string } }) {
+export default async function NewEventPage({ searchParams }: { searchParams?: { error?: string } }) {
   if (!hasDatabaseUrl) {
     return (
       <div className="space-y-4">
@@ -81,6 +84,8 @@ export default function NewEventPage({ searchParams }: { searchParams?: { error?
       </div>
     );
   }
+
+  await requireSessionUser();
 
   const roundPreview = buildRoundDefinitions("09:30", 120, 4);
   const noLanesError = searchParams?.error === "no-lanes";

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { DeleteEventButton } from "@/app/events/delete-event-button";
+import { LogoutButton } from "@/app/logout-button";
 import {
   ACTIVE_DELETE_ERROR,
   ARCHIVED_DELETE_ERROR,
@@ -10,12 +11,13 @@ import {
   DELETE_EVENT_WARNING_MESSAGE,
   closeChallenge,
   deleteChallengeCascade,
-  ensureActiveChallenge,
   setActiveChallenge,
   setChallengeArchivedStatus,
 } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
+import { requireSessionUser } from "@/lib/auth";
+import { getUserAccessibleChallenges, requireChallengeAccess } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
 
@@ -35,8 +37,11 @@ async function activateEvent(formData: FormData) {
 
   if (!hasDatabaseUrl) return;
 
+  const user = await requireSessionUser();
   const id = String(formData.get("id") || "").trim();
   if (!id) return;
+
+  await requireChallengeAccess(user, id);
 
   try {
     await setActiveChallenge(id);
@@ -58,9 +63,12 @@ async function toggleArchiveEvent(formData: FormData) {
 
   if (!hasDatabaseUrl) return;
 
+  const user = await requireSessionUser();
   const id = String(formData.get("id") || "").trim();
   const currentValue = String(formData.get("isArchived") || "").trim();
   if (!id) return;
+
+  await requireChallengeAccess(user, id);
 
   try {
     await setChallengeArchivedStatus(id, currentValue !== "true");
@@ -83,8 +91,11 @@ async function closeEvent(formData: FormData) {
 
   if (!hasDatabaseUrl) return;
 
+  const user = await requireSessionUser();
   const id = String(formData.get("id") || "").trim();
   if (!id) return;
+
+  await requireChallengeAccess(user, id);
 
   try {
     await closeChallenge(id);
@@ -108,8 +119,11 @@ async function deleteEvent(formData: FormData) {
 
   if (!hasDatabaseUrl) return;
 
+  const user = await requireSessionUser();
   const id = String(formData.get("id") || "").trim();
   if (!id) return;
+
+  await requireChallengeAccess(user, id);
 
   try {
     await deleteChallengeCascade(id);
@@ -150,42 +164,32 @@ export default async function EventsPage({
     );
   }
 
-  await ensureActiveChallenge();
+  const user = await requireSessionUser();
 
   const [events, distanceByChallenge] = await Promise.all([
-    prisma.challenge.findMany({
-      orderBy: [{ eventDate: "desc" }, { createdAt: "desc" }],
-      select: {
-        id: true,
-        name: true,
-        eventDate: true,
-        startTime: true,
-        durationMinutes: true,
-        roundsCount: true,
-        lanes25Count: true,
-        lanes50Count: true,
-        isActive: true,
-        isArchived: true,
-        closedAt: true,
-      },
-    }),
+    getUserAccessibleChallenges(user),
     prisma.sheetEntry.groupBy({
       by: ["sheetId"],
       _sum: { distanceM: true },
     }),
   ]);
 
+  const allowedIds = new Set(events.map((event) => event.id));
   const sheetMap = new Map(distanceByChallenge.map((entry) => [entry.sheetId, entry._sum.distanceM ?? 0]));
   const sheets = await prisma.sheet.findMany({ select: { id: true, challengeId: true } });
   const totals = new Map<string, number>();
 
   for (const sheet of sheets) {
+    if (!allowedIds.has(sheet.challengeId)) continue;
     totals.set(sheet.challengeId, (totals.get(sheet.challengeId) ?? 0) + (sheetMap.get(sheet.id) ?? 0));
   }
 
   return (
     <div className="space-y-6">
-      <BackToMainMenuLink />
+      <div className="flex items-center justify-between">
+        <BackToMainMenuLink />
+        <LogoutButton />
+      </div>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-semibold">Événements</h1>
@@ -220,6 +224,10 @@ export default async function EventsPage({
         <div className="rounded border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">
           Événement clôturé. Il est maintenant en consultation.
         </div>
+      ) : null}
+
+      {searchParams?.message === "forbidden" ? (
+        <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">Accès refusé à cet événement.</div>
       ) : null}
 
       {searchParams?.message === "saved" ? (

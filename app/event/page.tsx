@@ -1,9 +1,16 @@
 import { redirect } from "next/navigation";
-import { ensureActiveChallenge } from "@/lib/events";
+import { ensureActiveChallengeForUser } from "@/lib/access";
+import { requireSessionUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function EventPage() {
-  const challenge = await ensureActiveChallenge();
+  const user = await requireSessionUser();
+  const challenge = await ensureActiveChallengeForUser(user);
+
+  if (!challenge) {
+    redirect("/events");
+  }
+
   redirect(`/events/${challenge.id}`);
 }

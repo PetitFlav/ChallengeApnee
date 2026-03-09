@@ -12,6 +12,8 @@ import {
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_EVENT_TIMEZONE } from "@/lib/constants";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
+import { requireSessionUser } from "@/lib/auth";
+import { requireChallengeAccess } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
 
@@ -31,8 +33,11 @@ async function saveEventConfiguration(formData: FormData) {
 
   if (!hasDatabaseUrl) return;
 
+  const user = await requireSessionUser();
   const challengeId = String(formData.get("id") || "").trim();
   if (!challengeId) return;
+
+  await requireChallengeAccess(user, challengeId);
 
   const name = String(formData.get("name") || "").trim() || "Challenge Apnée";
   const eventDateRaw = String(formData.get("eventDate") || "").trim();
@@ -108,8 +113,11 @@ async function closeEvent(formData: FormData) {
 
   if (!hasDatabaseUrl) return;
 
+  const user = await requireSessionUser();
   const challengeId = String(formData.get("id") || "").trim();
   if (!challengeId) return;
+
+  await requireChallengeAccess(user, challengeId);
 
   try {
     await closeChallenge(challengeId);
@@ -148,6 +156,9 @@ export default async function EventDetailPage({
       </div>
     );
   }
+
+  const user = await requireSessionUser();
+  await requireChallengeAccess(user, params.id);
 
   const challenge = await prisma.challenge.findUnique({
     where: { id: params.id },
