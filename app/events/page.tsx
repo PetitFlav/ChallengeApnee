@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { DeleteEventButton } from "@/app/events/delete-event-button";
 import {
+  ACTIVE_DELETE_ERROR,
+  ARCHIVED_DELETE_ERROR,
   ARCHIVED_ACTIVATION_ERROR,
   ARCHIVED_READ_ONLY_MESSAGE,
+  DELETE_EVENT_WARNING_MESSAGE,
+  deleteChallengeCascade,
   ensureActiveChallenge,
   setActiveChallenge,
   setChallengeArchivedStatus,
@@ -68,6 +73,36 @@ async function toggleArchiveEvent(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath("/swimmers");
   revalidatePath("/sheets/new");
+}
+
+async function deleteEvent(formData: FormData) {
+  "use server";
+
+  if (!hasDatabaseUrl) return;
+
+  const id = String(formData.get("id") || "").trim();
+  if (!id) return;
+
+  try {
+    await deleteChallengeCascade(id);
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === ARCHIVED_DELETE_ERROR) {
+        redirect("/events?message=delete-archived");
+      }
+      if (error.message === ACTIVE_DELETE_ERROR) {
+        redirect("/events?message=delete-active");
+      }
+    }
+    throw error;
+  }
+
+  revalidatePath("/events");
+  revalidatePath("/dashboard");
+  revalidatePath("/swimmers");
+  revalidatePath("/sheets");
+  revalidatePath("/sheets/new");
+  revalidatePath("/public");
 }
 
 export default async function EventsPage({
@@ -142,6 +177,14 @@ export default async function EventsPage({
         </div>
       ) : null}
 
+      {searchParams?.message === "delete-archived" ? (
+        <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">{ARCHIVED_DELETE_ERROR}</div>
+      ) : null}
+
+      {searchParams?.message === "delete-active" ? (
+        <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">{ACTIVE_DELETE_ERROR}</div>
+      ) : null}
+
       <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
         {ARCHIVED_READ_ONLY_MESSAGE}
       </div>
@@ -203,6 +246,12 @@ export default async function EventsPage({
                           {event.isArchived ? "Désarchiver" : "Archiver"}
                         </button>
                       </form>
+                      {!event.isArchived ? (
+                        <form action={deleteEvent}>
+                          <input type="hidden" name="id" value={event.id} />
+                          <DeleteEventButton warningMessage={DELETE_EVENT_WARNING_MESSAGE} disabled={event.isActive} />
+                        </form>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
