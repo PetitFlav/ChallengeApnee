@@ -1,5 +1,6 @@
 import { ensureActiveChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
+import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ export default async function DashboardPage() {
   if (!hasDatabaseUrl) {
     return (
       <div className="space-y-4">
+        <BackToMainMenuLink />
         <h1 className="text-3xl font-semibold">Dashboard</h1>
         <div className="rounded border border-amber-300 bg-amber-50 p-4 text-amber-800">
           Définissez la variable DATABASE_URL pour activer le dashboard.
@@ -44,6 +46,7 @@ export default async function DashboardPage() {
 
     return (
       <div className="space-y-6">
+        <BackToMainMenuLink />
         <div>
           <h1 className="text-3xl font-semibold">Dashboard</h1>
           <p className="text-slate-600">Vue événement et cumul des distances.</p>
@@ -73,6 +76,7 @@ export default async function DashboardPage() {
   } catch {
     return (
       <div className="space-y-4">
+        <BackToMainMenuLink />
         <h1 className="text-3xl font-semibold">Dashboard</h1>
         <div className="rounded border border-amber-300 bg-amber-50 p-4 text-amber-800">
           Impossible de se connecter à la base de données. Vérifiez DATABASE_URL.

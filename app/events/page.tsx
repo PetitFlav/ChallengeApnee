@@ -14,6 +14,7 @@ import {
   setChallengeArchivedStatus,
 } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
+import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +114,7 @@ export default async function EventsPage({
   if (!hasDatabaseUrl) {
     return (
       <div className="space-y-4">
+        <BackToMainMenuLink />
         <h1 className="text-3xl font-semibold">Événements</h1>
         <div className="rounded border border-amber-300 bg-amber-50 p-4 text-amber-800">
           Définissez la variable DATABASE_URL pour activer la gestion des événements.
@@ -155,6 +157,7 @@ export default async function EventsPage({
 
   return (
     <div className="space-y-6">
+      <BackToMainMenuLink />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-semibold">Événements</h1>

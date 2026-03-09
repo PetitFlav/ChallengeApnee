@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { buildRoundDefinitions, regenerateEventStructure, sanitizeStartTime } from "@/lib/challenge";
 import { createDefaultEvent, setActiveChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
+import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,7 @@ export default function NewEventPage({ searchParams }: { searchParams?: { error?
   if (!hasDatabaseUrl) {
     return (
       <div className="space-y-4">
+        <BackToMainMenuLink />
         <h1 className="text-3xl font-semibold">Nouvel événement</h1>
         <div className="rounded border border-amber-300 bg-amber-50 p-4 text-amber-800">
           Définissez la variable DATABASE_URL pour activer la gestion des événements.
@@ -72,6 +74,7 @@ export default function NewEventPage({ searchParams }: { searchParams?: { error?
 
   return (
     <div className="space-y-6">
+      <BackToMainMenuLink />
       <div>
         <h1 className="text-3xl font-semibold">Nouvel événement</h1>
         <p className="text-slate-600">Créez un événement avec sa configuration initiale.</p>

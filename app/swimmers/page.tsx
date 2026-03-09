@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { ARCHIVED_READ_ONLY_MESSAGE, assertChallengeWritable, ensureActiveChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
+import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import { SwimmerCreateForm } from "./swimmer-create-form";
 
 export const dynamic = "force-dynamic";
@@ -319,6 +320,7 @@ export default async function SwimmersPage({
   if (!hasDatabaseUrl) {
     return (
       <div className="space-y-4">
+        <BackToMainMenuLink />
         <h1 className="text-3xl font-semibold">Nageurs</h1>
         <div className="rounded border border-amber-300 bg-amber-50 p-4 text-amber-800">
           Définissez la variable DATABASE_URL pour activer le CRUD nageurs/clubs/sections.
@@ -380,6 +382,7 @@ export default async function SwimmersPage({
 
   return (
     <div className="space-y-8">
+      <BackToMainMenuLink />
       <h1 className="text-3xl font-semibold">Nageurs</h1>
 
       {isArchived ? (

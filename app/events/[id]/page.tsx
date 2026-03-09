@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { buildRoundDefinitions, regenerateEventStructure, sanitizeStartTime } from "@/lib/challenge";
 import { ARCHIVED_READ_ONLY_MESSAGE, assertChallengeWritable, setActiveChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
+import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,7 @@ export default async function EventDetailPage({
   if (!hasDatabaseUrl) {
     return (
       <div className="space-y-4">
+        <BackToMainMenuLink />
         <h1 className="text-3xl font-semibold">Configuration événement</h1>
         <div className="rounded border border-amber-300 bg-amber-50 p-4 text-amber-800">
           Définissez la variable DATABASE_URL pour activer la configuration.
@@ -114,6 +116,7 @@ export default async function EventDetailPage({
 
   return (
     <div className="space-y-6">
+      <BackToMainMenuLink />
       <div>
         <h1 className="text-3xl font-semibold">Configurer un événement</h1>
         <p className="text-slate-600">Modifiez puis régénérez lignes et tournées.</p>

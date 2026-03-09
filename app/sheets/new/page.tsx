@@ -2,6 +2,7 @@ import { SheetStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { ARCHIVED_READ_ONLY_MESSAGE, assertChallengeWritable, ensureActiveChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
+import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import { NewSheetForm } from "./new-sheet-form";
 
 export const dynamic = "force-dynamic";
@@ -238,6 +239,7 @@ export default async function NewSheetPage() {
   if (!hasDatabaseUrl) {
     return (
       <div className="space-y-4">
+        <BackToMainMenuLink />
         <h1 className="text-3xl font-semibold">Nouvelle feuille</h1>
         <div className="rounded border border-amber-300 bg-amber-50 p-4 text-amber-800">
           Définissez la variable DATABASE_URL pour activer la saisie des feuilles.
@@ -300,6 +302,7 @@ export default async function NewSheetPage() {
 
     return (
       <div className="space-y-4">
+        <BackToMainMenuLink />
         <h1 className="text-3xl font-semibold">Nouvelle feuille</h1>
         <p className="text-slate-600">Sélectionnez tournée + ligne, puis saisissez les nageurs.</p>
         {isArchived ? (
