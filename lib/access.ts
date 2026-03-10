@@ -67,9 +67,9 @@ export async function ensureActiveChallengeForUser(user: SessionUser) {
   });
 }
 
-export async function requireSuperUser(user: SessionUser) {
+export async function requireSuperUser(user: SessionUser, redirectPath = "/") {
   if (!user.isSuperUser) {
-    redirect("/");
+    redirect(redirectPath);
   }
 }
 

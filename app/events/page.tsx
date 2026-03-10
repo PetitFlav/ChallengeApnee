@@ -195,9 +195,11 @@ export default async function EventsPage({
           <h1 className="text-3xl font-semibold">Événements</h1>
           <p className="text-slate-600">Liste, activation et archivage des événements.</p>
         </div>
-        <Link href="/events/new" className="rounded bg-blue-600 px-4 py-2 text-white">
-          Nouvel événement
-        </Link>
+        {user.isSuperUser ? (
+          <Link href="/events/new" className="rounded bg-blue-600 px-4 py-2 text-white">
+            Nouvel événement
+          </Link>
+        ) : null}
       </div>
 
       {searchParams?.message === "archived" ? (
@@ -228,6 +230,12 @@ export default async function EventsPage({
 
       {searchParams?.message === "forbidden" ? (
         <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">Accès refusé à cet événement.</div>
+      ) : null}
+
+      {searchParams?.message === "forbidden-create" ? (
+        <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          Accès refusé : seuls les super utilisateurs peuvent créer un événement.
+        </div>
       ) : null}
 
       {searchParams?.message === "saved" ? (
