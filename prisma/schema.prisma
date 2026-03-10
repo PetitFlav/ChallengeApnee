@@ -30,6 +30,7 @@ model Challenge {
   sheets          Sheet[]
   swimmers        Swimmer[]
   userLinks       ChallengeUser[]
+  finalResults    FinalResult[]
 
   @@map("challenges")
 }
@@ -45,6 +46,7 @@ model User {
   updatedAt    DateTime        @updatedAt
   challenges   ChallengeUser[]
   verifications Verification[]
+  validatedFinalResults FinalResult[] @relation("FinalResultValidatedBy")
 
   @@map("users")
 }
@@ -71,6 +73,7 @@ model Club {
   updatedAt  DateTime        @updatedAt
   challenges ChallengeClub[]
   swimmers   Swimmer[]
+  finalResults FinalResult[]
 
   @@map("clubs")
 }
@@ -97,6 +100,7 @@ model Section {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   swimmers  Swimmer[]
+  finalResults FinalResult[]
 
   @@map("sections")
 }
@@ -114,6 +118,7 @@ model Swimmer {
   updatedAt   DateTime     @updatedAt
   entries     SheetEntry[]
   verificationLines VerificationLine[]
+  finalResults FinalResult[]
   challenge   Challenge    @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   club        Club?        @relation(fields: [clubId], references: [id])
   section     Section?     @relation(fields: [sectionId], references: [id])
@@ -138,6 +143,7 @@ model Lane {
   updatedAt    DateTime  @updatedAt
   challenge    Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   sheets       Sheet[]
+  finalResults FinalResult[]
 
   @@unique([challengeId, code])
   @@index([challengeId, displayOrder])
@@ -155,6 +161,7 @@ model Round {
   updatedAt     DateTime  @updatedAt
   challenge     Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   sheets        Sheet[]
+  finalResults  FinalResult[]
 
   @@unique([challengeId, roundNumber])
   @@index([challengeId, displayOrder])
@@ -173,6 +180,7 @@ model Sheet {
   updatedAt   DateTime     @updatedAt
   entries     SheetEntry[]
   verifications Verification[]
+  finalResults FinalResult[]
   challenge   Challenge    @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   lane        Lane         @relation(fields: [laneId], references: [id])
   round       Round        @relation(fields: [roundId], references: [id])
@@ -190,6 +198,7 @@ model Verification {
   userId     String
   createdAt  DateTime          @default(now())
   lines      VerificationLine[]
+  finalResults FinalResult[]
   sheet      Sheet             @relation(fields: [sheetId], references: [id], onDelete: Cascade)
   user       User              @relation(fields: [userId], references: [id])
 
@@ -210,6 +219,7 @@ model VerificationLine {
   createdAt      DateTime     @default(now())
   verification   Verification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
   swimmer        Swimmer      @relation(fields: [swimmerId], references: [id])
+  finalResults   FinalResult[]
 
   @@index([verificationId])
   @@index([swimmerId])
@@ -229,6 +239,7 @@ model SheetEntry {
   updatedAt    DateTime @updatedAt
   sheet        Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
   swimmer      Swimmer  @relation(fields: [swimmerId], references: [id])
+  finalResults FinalResult[]
 
   @@index([sheetId])
   @@index([swimmerId])
@@ -236,7 +247,55 @@ model SheetEntry {
   @@map("sheet_entries")
 }
 
+model FinalResult {
+  id                       String            @id @default(cuid())
+  challengeId              String
+  roundId                  String
+  laneId                   String
+  sheetId                  String
+  swimmerId                String
+  clubId                   String?
+  sectionId                String?
+  source                   FinalResultSource
+  sourceVerificationId     String?
+  sourceVerificationLineId String?
+  sourceSheetEntryId       String?
+  squares                  Int
+  ticks                    Int
+  totalLengths             Int
+  distanceM                Int
+  validatedByUserId        String
+  validatedAt              DateTime          @default(now())
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+
+  challenge                Challenge         @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  round                    Round             @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  lane                     Lane              @relation(fields: [laneId], references: [id], onDelete: Cascade)
+  sheet                    Sheet             @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  swimmer                  Swimmer           @relation(fields: [swimmerId], references: [id], onDelete: Cascade)
+  club                     Club?             @relation(fields: [clubId], references: [id])
+  section                  Section?          @relation(fields: [sectionId], references: [id])
+  sourceVerification       Verification?     @relation(fields: [sourceVerificationId], references: [id])
+  sourceVerificationLine   VerificationLine? @relation(fields: [sourceVerificationLineId], references: [id])
+  sourceSheetEntry         SheetEntry?       @relation(fields: [sourceSheetEntryId], references: [id])
+  validatedBy              User              @relation("FinalResultValidatedBy", fields: [validatedByUserId], references: [id])
+
+  @@unique([challengeId, roundId, laneId, swimmerId])
+  @@index([challengeId, validatedAt])
+  @@index([sheetId])
+  @@index([swimmerId])
+  @@index([validatedByUserId])
+  @@map("final_results")
+}
+
 enum SheetStatus {
   DRAFT
   VALIDATED
+}
+
+enum FinalResultSource {
+  original
+  verification
+  manual
 }
