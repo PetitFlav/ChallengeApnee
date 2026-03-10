@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useFormState } from "react-dom";
-import { compareSheetAndVerification, getVerificationStatus, type ComparableLine } from "@/lib/verification";
+import { type ComparableLine } from "@/lib/verification";
 
 type RoundOption = { id: string; label: string };
 type LaneOption = { id: string; code: string; distanceM: number };
@@ -108,16 +108,6 @@ export function VerificationForm({ rounds, lanes, swimmers, sheets, action }: Pr
       .filter((row): row is ComparableLine => row !== null);
   }, [rows]);
 
-  const comparison = useMemo(() => {
-    if (!selectedSheet?.latestVerificationLines) return null;
-    return compareSheetAndVerification(selectedSheet.originalLines, selectedSheet.latestVerificationLines);
-  }, [selectedSheet]);
-
-  const status = useMemo(() => {
-    if (!selectedSheet) return "NON VÉRIFIÉ";
-    return getVerificationStatus(selectedSheet.originalLines, selectedSheet.latestVerificationLines);
-  }, [selectedSheet]);
-
   function updateRow(index: number, patch: Partial<Row>) {
     setRows((currentRows) => currentRows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
@@ -153,7 +143,7 @@ export function VerificationForm({ rounds, lanes, swimmers, sheets, action }: Pr
 
         <div className="space-y-1">
           <p className="text-sm font-medium text-slate-700">Statut feuille</p>
-          <p className="rounded border bg-slate-50 p-2 text-slate-800">{selectedSheet ? status : "NON VÉRIFIÉ"}</p>
+          <p className="rounded border bg-slate-50 p-2 text-slate-800">{selectedSheet?.latestVerificationLines ? "VÉRIFIÉE" : "NON VÉRIFIÉE"}</p>
         </div>
       </div>
 
@@ -223,15 +213,6 @@ export function VerificationForm({ rounds, lanes, swimmers, sheets, action }: Pr
       <button type="button" onClick={() => setRows((currentRows) => [...currentRows, EMPTY_ROW])} disabled={isLocked} className="rounded border border-slate-300 px-3 py-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400">
         Ajouter une ligne
       </button>
-
-      {comparison ? (
-        <div className="rounded border bg-slate-50 p-3 text-sm text-slate-700">
-          <p>Lignes identiques : {comparison.identicalCount}</p>
-          <p>Différences carrés/traits : {comparison.differentValues.length}</p>
-          <p>Nageurs manquants : {comparison.missingSwimmers.length}</p>
-          <p>Nageurs ajoutés : {comparison.addedSwimmers.length}</p>
-        </div>
-      ) : null}
 
       {state.error ? <p className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">{state.error}</p> : null}
       {state.success ? <p className="rounded border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-700">{state.success}</p> : null}

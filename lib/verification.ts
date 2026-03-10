@@ -11,7 +11,13 @@ export type VerificationComparison = {
   addedSwimmers: number[];
 };
 
-export type VerificationStatus = "OK" | "DIFFÉRENCES" | "NON VÉRIFIÉ";
+export type DashboardVerificationStatus =
+  | "Non vérifiée"
+  | "Partiellement vérifiée"
+  | "Vérifiée sans écart"
+  | "Vérifiée avec écarts";
+
+export type DashboardSwimmerStatus = "OK" | "Différence" | "Absent en vérification" | "Ajouté en vérification";
 
 export function compareSheetAndVerification(
   originalLines: ComparableLine[],
@@ -63,17 +69,28 @@ export function compareSheetAndVerification(
   };
 }
 
-export function getVerificationStatus(
-  originalLines: ComparableLine[],
-  verificationLines: ComparableLine[] | null,
-): VerificationStatus {
-  if (!verificationLines) {
-    return "NON VÉRIFIÉ";
+export function getDashboardVerificationStatus(params: {
+  sheetsCount: number;
+  verifiedSheetsCount: number;
+  differencesCount: number;
+}): DashboardVerificationStatus {
+  const { sheetsCount, verifiedSheetsCount, differencesCount } = params;
+
+  if (sheetsCount === 0 || verifiedSheetsCount === 0) {
+    return "Non vérifiée";
   }
 
-  const comparison = compareSheetAndVerification(originalLines, verificationLines);
-  const hasDifferences =
-    comparison.differentValues.length > 0 || comparison.missingSwimmers.length > 0 || comparison.addedSwimmers.length > 0;
+  if (verifiedSheetsCount < sheetsCount) {
+    return "Partiellement vérifiée";
+  }
 
-  return hasDifferences ? "DIFFÉRENCES" : "OK";
+  if (differencesCount > 0) {
+    return "Vérifiée avec écarts";
+  }
+
+  return "Vérifiée sans écart";
+}
+
+export function countComparisonDifferences(comparison: VerificationComparison): number {
+  return comparison.differentValues.length + comparison.missingSwimmers.length + comparison.addedSwimmers.length;
 }
