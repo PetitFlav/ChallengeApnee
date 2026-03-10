@@ -7,7 +7,7 @@ import { LogoutButton } from "@/app/logout-button";
 const links = [
   ["/events", "Événements"],
   ["/swimmers", "Nageurs"],
-  ["/sheets", "Feuilles"],
+  ["/sheets", "Vérifications saisies"],
   ["/sheets/new", "Saisie des distances"],
   ["/dashboard", "Dashboard"],
   ["/public", "Écran public"],

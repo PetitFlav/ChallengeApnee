@@ -44,6 +44,7 @@ model User {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   challenges   ChallengeUser[]
+  verifications Verification[]
 
   @@map("users")
 }
@@ -112,6 +113,7 @@ model Swimmer {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   entries     SheetEntry[]
+  verificationLines VerificationLine[]
   challenge   Challenge    @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   club        Club?        @relation(fields: [clubId], references: [id])
   section     Section?     @relation(fields: [sectionId], references: [id])
@@ -170,6 +172,7 @@ model Sheet {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   entries     SheetEntry[]
+  verifications Verification[]
   challenge   Challenge    @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   lane        Lane         @relation(fields: [laneId], references: [id])
   round       Round        @relation(fields: [roundId], references: [id])
@@ -179,6 +182,38 @@ model Sheet {
   @@index([roundId])
   @@index([laneId])
   @@map("sheets")
+}
+
+model Verification {
+  id        String             @id @default(cuid())
+  sheetId    String
+  userId     String
+  createdAt  DateTime          @default(now())
+  lines      VerificationLine[]
+  sheet      Sheet             @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  user       User              @relation(fields: [userId], references: [id])
+
+  @@index([sheetId, createdAt])
+  @@index([userId])
+  @@map("verifications")
+}
+
+model VerificationLine {
+  id             String       @id @default(cuid())
+  verificationId String
+  swimmerId      String
+  squares        Int
+  ticks          Int
+  totalLengths   Int
+  distanceM      Int
+  createdAt      DateTime     @default(now())
+  verification   Verification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+  swimmer        Swimmer      @relation(fields: [swimmerId], references: [id])
+
+  @@index([verificationId])
+  @@index([swimmerId])
+  @@index([verificationId, swimmerId])
+  @@map("verification_lines")
 }
 
 model SheetEntry {
