@@ -195,6 +195,7 @@ model Verification {
 
   @@index([sheetId, createdAt])
   @@index([userId])
+  @@unique([sheetId, userId])
   @@map("verifications")
 }
 

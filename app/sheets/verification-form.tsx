@@ -19,7 +19,7 @@ type SheetRecord = {
   roundId: string;
   laneId: string;
   originalLines: ComparableLine[];
-  latestVerificationLines: ComparableLine[] | null;
+  userVerificationLines: ComparableLine[] | null;
 };
 
 type Row = {
@@ -64,9 +64,9 @@ export function VerificationForm({ rounds, lanes, swimmers, sheets, action }: Pr
       return;
     }
 
-    if (selectedSheet.latestVerificationLines && selectedSheet.latestVerificationLines.length > 0) {
+    if (selectedSheet.userVerificationLines && selectedSheet.userVerificationLines.length > 0) {
       setRows(
-        selectedSheet.latestVerificationLines.map((line) => ({
+        selectedSheet.userVerificationLines.map((line) => ({
           swimmerNumber: String(line.swimmerNumber),
           squares: String(line.squares),
           ticks: String(line.ticks),
@@ -143,7 +143,7 @@ export function VerificationForm({ rounds, lanes, swimmers, sheets, action }: Pr
 
         <div className="space-y-1">
           <p className="text-sm font-medium text-slate-700">Statut feuille</p>
-          <p className="rounded border bg-slate-50 p-2 text-slate-800">{selectedSheet?.latestVerificationLines ? "VÉRIFIÉE" : "NON VÉRIFIÉE"}</p>
+          <p className="rounded border bg-slate-50 p-2 text-slate-800">{selectedSheet?.userVerificationLines ? "MA VÉRIFICATION EXISTE" : "PAS ENCORE VÉRIFIÉE PAR MOI"}</p>
         </div>
       </div>
 

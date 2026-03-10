@@ -103,11 +103,32 @@ async function saveVerification(_prevState: SaveState, formData: FormData): Prom
     return { error: `Nageur introuvable pour les numéros: ${missingSwimmerNumbers.join(", ")}.`, success: null };
   }
 
-  await prisma.verification.create({
-    data: {
+  await prisma.verification.upsert({
+    where: {
+      sheetId_userId: {
+        sheetId: sheet.id,
+        userId: user.id,
+      },
+    },
+    create: {
       sheetId: sheet.id,
       userId: user.id,
       lines: {
+        create: lines.map((line) => {
+          const totalLengths = line.squares * 4 + line.ticks;
+          return {
+            swimmerId: swimmerIdByNumber.get(line.swimmerNumber) as string,
+            squares: line.squares,
+            ticks: line.ticks,
+            totalLengths,
+            distanceM: totalLengths * sheet.lane.distanceM,
+          };
+        }),
+      },
+    },
+    update: {
+      lines: {
+        deleteMany: {},
         create: lines.map((line) => {
           const totalLengths = line.squares * 4 + line.ticks;
           return {
@@ -158,7 +179,7 @@ export default async function SheetsPage() {
           select: { swimmer: { select: { number: true } }, squares: true, ticks: true },
         },
         verifications: {
-          orderBy: { createdAt: "desc" },
+          where: { userId: user.id },
           take: 1,
           select: {
             lines: {
@@ -196,9 +217,8 @@ export default async function SheetsPage() {
             squares: entry.squares,
             ticks: entry.ticks,
           })),
-          latestVerificationLines:
-            sheet.verifications[0]?.lines.map((line) => ({ swimmerNumber: line.swimmer.number, squares: line.squares, ticks: line.ticks })) ??
-            null,
+          userVerificationLines:
+            sheet.verifications[0]?.lines.map((line) => ({ swimmerNumber: line.swimmer.number, squares: line.squares, ticks: line.ticks })) ?? null,
         }))}
         action={saveVerification}
       />
