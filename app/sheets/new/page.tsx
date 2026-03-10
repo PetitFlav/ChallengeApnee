@@ -5,7 +5,7 @@ import {
   CLOSED_READ_ONLY_MESSAGE,
 } from "@/lib/events";
 import { requireSessionUser } from "@/lib/auth";
-import { requireActiveChallengeForUser } from "@/lib/access";
+import { requireActiveChallengeForUser, requireRestrictedModulesAccess } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { buildRoundAvailability } from "@/lib/rounds";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
@@ -94,6 +94,9 @@ function parseEntries(entriesJson: string): CreateSheetEntryInput[] | null {
 async function saveSheet(_prevState: CreateSheetState, formData: FormData): Promise<CreateSheetState> {
   "use server";
 
+  const user = await requireSessionUser();
+  await requireRestrictedModulesAccess(user);
+
   if (!hasDatabaseUrl) {
     return {
       error: "Base de données indisponible.",
@@ -102,8 +105,6 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
       nextRoundId: null,
     };
   }
-
-  const user = await requireSessionUser();
   const challenge = await requireActiveChallengeForUser(user);
   const roundId = String(formData.get("roundId") || "").trim();
   const laneId = String(formData.get("laneId") || "").trim();
@@ -340,6 +341,9 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
 }
 
 export default async function NewSheetPage() {
+  const user = await requireSessionUser();
+  await requireRestrictedModulesAccess(user);
+
   if (!hasDatabaseUrl) {
     return (
       <div className="space-y-4">
@@ -353,8 +357,7 @@ export default async function NewSheetPage() {
   }
 
   try {
-    const user = await requireSessionUser();
-  const challenge = await requireActiveChallengeForUser(user);
+    const challenge = await requireActiveChallengeForUser(user);
     const isArchived = challenge.isArchived;
     const isClosed = Boolean(challenge.closedAt);
 

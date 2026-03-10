@@ -1,16 +1,21 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
-import { ensurePreferredChallengeForUser, NO_CHALLENGE_ACCESS_MESSAGE } from "@/lib/access";
+import {
+  canAccessRestrictedModules,
+  ensurePreferredChallengeForUser,
+  NO_CHALLENGE_ACCESS_MESSAGE,
+  UNAUTHORIZED_MODULE_ACCESS_MESSAGE,
+} from "@/lib/access";
 import { LogoutButton } from "@/app/logout-button";
 
 const links = [
-  ["/events", "Événements"],
-  ["/swimmers", "Nageurs"],
-  ["/sheets", "Vérifications saisies"],
-  ["/sheets/new", "Saisie des distances"],
-  ["/dashboard", "Dashboard"],
-  ["/public", "Écran public"],
+  { href: "/events", label: "Événements", restricted: false },
+  { href: "/swimmers", label: "Nageurs", restricted: false },
+  { href: "/sheets", label: "Vérification", restricted: true },
+  { href: "/sheets/new", label: "Saisie des longueurs", restricted: true },
+  { href: "/dashboard", label: "Dashboard", restricted: true },
+  { href: "/public", label: "Écran public", restricted: true },
 ] as const;
 
 export default async function HomePage({ searchParams }: { searchParams?: { message?: string } }) {
@@ -21,6 +26,7 @@ export default async function HomePage({ searchParams }: { searchParams?: { mess
 
   const challenge = await ensurePreferredChallengeForUser(user);
   const hasChallengeAccess = Boolean(challenge);
+  const hasRestrictedModulesAccess = canAccessRestrictedModules(user);
 
   return (
     <div className="space-y-4">
@@ -40,16 +46,35 @@ export default async function HomePage({ searchParams }: { searchParams?: { mess
         </div>
       ) : null}
 
+      {searchParams?.message === "forbidden-module" ? (
+        <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          {UNAUTHORIZED_MODULE_ACCESS_MESSAGE}
+        </div>
+      ) : null}
+
       <nav className="grid gap-2 sm:grid-cols-2">
-        {links.map(([href, label]) => (
-          <Link
-            key={href}
-            href={hasChallengeAccess ? href : "/?message=no-active-event"}
-            className="rounded border bg-white p-3 hover:bg-slate-100"
-          >
-            {label}
-          </Link>
-        ))}
+        {links.map((link) => {
+          const isDisabled =
+            !hasChallengeAccess || (link.restricted && !hasRestrictedModulesAccess);
+
+          if (isDisabled) {
+            return (
+              <span
+                key={link.href}
+                aria-disabled="true"
+                className="cursor-not-allowed rounded border bg-slate-100 p-3 text-slate-500"
+              >
+                {link.label}
+              </span>
+            );
+          }
+
+          return (
+            <Link key={link.href} href={link.href} className="rounded border bg-white p-3 hover:bg-slate-100">
+              {link.label}
+            </Link>
+          );
+        })}
         {user.isSuperUser ? (
           <Link href="/admin/users" className="rounded border bg-white p-3 hover:bg-slate-100">
             Gestion des utilisateurs

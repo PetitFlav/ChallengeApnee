@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import { LogoutButton } from "@/app/logout-button";
 import { requireSessionUser } from "@/lib/auth";
-import { requireActiveChallengeForUser } from "@/lib/access";
+import { requireActiveChallengeForUser, requireRestrictedModulesAccess } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { VerificationForm } from "./verification-form";
 
@@ -51,6 +51,7 @@ async function saveVerification(_prevState: SaveState, formData: FormData): Prom
   "use server";
 
   const user = await requireSessionUser();
+  await requireRestrictedModulesAccess(user);
   const challenge = await requireActiveChallengeForUser(user);
 
   const sheetId = String(formData.get("sheetId") ?? "").trim();
@@ -150,6 +151,7 @@ async function saveVerification(_prevState: SaveState, formData: FormData): Prom
 
 export default async function SheetsPage() {
   const user = await requireSessionUser();
+  await requireRestrictedModulesAccess(user);
   const challenge = await requireActiveChallengeForUser(user);
 
   const [rounds, lanes, swimmers, sheets] = await Promise.all([

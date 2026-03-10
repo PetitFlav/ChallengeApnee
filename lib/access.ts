@@ -8,6 +8,17 @@ type SessionUser = {
 
 export const NO_ACTIVE_CHALLENGE_ACCESS_MESSAGE = "Aucun événement actif ne vous est accessible actuellement.";
 export const NO_CHALLENGE_ACCESS_MESSAGE = "Aucun événement ne vous est accessible actuellement.";
+export const UNAUTHORIZED_MODULE_ACCESS_MESSAGE = "Accès non autorisé à cette fonctionnalité.";
+
+export function canAccessRestrictedModules(user: SessionUser) {
+  return user.isSuperUser;
+}
+
+export async function requireRestrictedModulesAccess(user: SessionUser) {
+  if (!canAccessRestrictedModules(user)) {
+    redirect("/?message=forbidden-module");
+  }
+}
 
 export async function getUserAccessibleChallenges(user: SessionUser) {
   if (user.isSuperUser) {
