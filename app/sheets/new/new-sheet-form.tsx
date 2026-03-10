@@ -185,7 +185,9 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
   }
 
   function getRoundOptionLabel(round: RoundOption) {
-    if (round.status === "active") return `${round.label} (ouverte ${round.opensAtLabel} → ${round.closesAtLabel})`;
+    const closesAtDisplayLabel = round.closesAtLabel === "-" ? "Clôture événement" : round.closesAtLabel;
+
+    if (round.status === "active") return `${round.label} (ouverte ${round.opensAtLabel} → ${closesAtDisplayLabel})`;
     if (round.status === "closed") return `${round.label} (fermée)`;
     return `${round.label} (ouvrira à ${round.opensAtLabel})`;
   }
@@ -245,7 +247,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
       {loadedMessage ? <p className="rounded border border-blue-200 bg-blue-50 p-2 text-sm text-blue-700">{loadedMessage}</p> : null}
       {activeRound ? (
         <p className="rounded border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-800">
-          Tournée ouverte actuellement : <strong>{activeRound.label}</strong> ({activeRound.opensAtLabel} → {activeRound.closesAtLabel}).
+          Tournée ouverte actuellement : <strong>{activeRound.label}</strong> ({activeRound.opensAtLabel} → {activeRound.closesAtLabel === "-" ? "Clôture événement" : activeRound.closesAtLabel}).
         </p>
       ) : (
         <p className="rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">
