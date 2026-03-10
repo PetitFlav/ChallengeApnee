@@ -1,6 +1,10 @@
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
+import { requireSessionUser } from "@/lib/auth";
+import { requireRestrictedModulesAccess } from "@/lib/access";
 
-export default function PublicScreenPage() {
+export default async function PublicScreenPage() {
+  const user = await requireSessionUser();
+  await requireRestrictedModulesAccess(user);
   return (
     <div className="space-y-4">
       <BackToMainMenuLink />

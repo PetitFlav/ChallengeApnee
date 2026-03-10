@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { ARCHIVED_READ_ONLY_MESSAGE, assertChallengeWritable } from "@/lib/events";
 import { requireSessionUser } from "@/lib/auth";
-import { requireActiveChallengeForUser } from "@/lib/access";
+import { requirePreferredChallengeForUser } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import { SwimmerCreateForm } from "./swimmer-create-form";
@@ -72,7 +72,7 @@ async function createSwimmer(_prevState: CreateSwimmerState, formData: FormData)
   }
 
   const user = await requireSessionUser();
-  const challenge = await requireActiveChallengeForUser(user);
+  const challenge = await requirePreferredChallengeForUser(user);
   await assertChallengeWritable(challenge.id);
   const fallbackNextNumber = await getNextSwimmerNumber(challenge.id);
 
@@ -92,7 +92,7 @@ async function createSwimmer(_prevState: CreateSwimmerState, formData: FormData)
 
     if (!participantClub) {
       return {
-        error: "Ce club n'est pas rattaché à l'événement actif.",
+        error: "Ce club n'est pas rattaché à l'événement.",
         success: false,
         nextNumber: fallbackNextNumber,
       };
@@ -150,7 +150,7 @@ async function updateSwimmer(formData: FormData) {
   if (!hasDatabaseUrl) return;
 
   const user = await requireSessionUser();
-  const challenge = await requireActiveChallengeForUser(user);
+  const challenge = await requirePreferredChallengeForUser(user);
   await assertChallengeWritable(challenge.id);
 
   const swimmerId = String(formData.get("id") || "").trim();
@@ -199,7 +199,7 @@ async function deleteSwimmer(formData: FormData) {
   if (!hasDatabaseUrl) return;
 
   const user = await requireSessionUser();
-  const challenge = await requireActiveChallengeForUser(user);
+  const challenge = await requirePreferredChallengeForUser(user);
   await assertChallengeWritable(challenge.id);
 
   const swimmerId = String(formData.get("id") || "").trim();
@@ -235,7 +235,7 @@ async function createClub(formData: FormData) {
   if (!hasDatabaseUrl) return;
 
   const user = await requireSessionUser();
-  const challenge = await requireActiveChallengeForUser(user);
+  const challenge = await requirePreferredChallengeForUser(user);
   await assertChallengeWritable(challenge.id);
 
   const name = String(formData.get("name") || "").trim();
@@ -271,7 +271,7 @@ async function deleteClub(formData: FormData) {
   if (!hasDatabaseUrl) return;
 
   const user = await requireSessionUser();
-  const challenge = await requireActiveChallengeForUser(user);
+  const challenge = await requirePreferredChallengeForUser(user);
   await assertChallengeWritable(challenge.id);
 
   await prisma.challengeClub.delete({
@@ -292,7 +292,7 @@ async function toggleHostClub(formData: FormData) {
   if (!hasDatabaseUrl) return;
 
   const user = await requireSessionUser();
-  const challenge = await requireActiveChallengeForUser(user);
+  const challenge = await requirePreferredChallengeForUser(user);
   await assertChallengeWritable(challenge.id);
 
   const clubId = String(formData.get("id") || "").trim();
@@ -339,7 +339,7 @@ async function createSection(formData: FormData) {
   if (!hasDatabaseUrl) return;
 
   const user = await requireSessionUser();
-  const challenge = await requireActiveChallengeForUser(user);
+  const challenge = await requirePreferredChallengeForUser(user);
   await assertChallengeWritable(challenge.id);
 
   const name = String(formData.get("name") || "").trim();
@@ -355,7 +355,7 @@ async function deleteSection(formData: FormData) {
   if (!hasDatabaseUrl) return;
 
   const user = await requireSessionUser();
-  const challenge = await requireActiveChallengeForUser(user);
+  const challenge = await requirePreferredChallengeForUser(user);
   await assertChallengeWritable(challenge.id);
 
   await prisma.section.delete({ where: { id: String(formData.get("id")) } });
@@ -384,7 +384,7 @@ export default async function SwimmersPage({
 
   try {
     const user = await requireSessionUser();
-  const challenge = await requireActiveChallengeForUser(user);
+  const challenge = await requirePreferredChallengeForUser(user);
     const isArchived = challenge.isArchived;
 
     const searchNumber = Number(query);
