@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DashboardSwimmerStatus, DashboardVerificationStatus } from "@/lib/verification";
 
 type VerificationDetailRow = {
@@ -80,16 +80,89 @@ export function VerificationDashboard({
   rounds: RoundRow[];
   saveFinalResultAction: (formData: FormData) => Promise<void>;
 }) {
+  const [dashboardRounds, setDashboardRounds] = useState(rounds);
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
   const [selectedLaneId, setSelectedLaneId] = useState<string | null>(null);
   const [selectedSwimmer, setSelectedSwimmer] = useState<SwimmerRow | null>(null);
 
-  const selectedRound = useMemo(() => rounds.find((round) => round.roundId === selectedRoundId) ?? null, [rounds, selectedRoundId]);
+  useEffect(() => {
+    setDashboardRounds(rounds);
+  }, [rounds]);
+
+  const selectedRound = useMemo(
+    () => dashboardRounds.find((round) => round.roundId === selectedRoundId) ?? null,
+    [dashboardRounds, selectedRoundId],
+  );
 
   const selectedLane = useMemo(
     () => selectedRound?.lanes.find((lane) => lane.laneId === selectedLaneId) ?? null,
     [selectedLaneId, selectedRound],
   );
+
+  async function handleSaveFinalResult(formData: FormData) {
+    await saveFinalResultAction(formData);
+
+    const roundId = String(formData.get("roundId") ?? "");
+    const laneId = String(formData.get("laneId") ?? "");
+    const swimmerId = String(formData.get("swimmerId") ?? "");
+
+    if (!roundId || !laneId || !swimmerId) {
+      setSelectedSwimmer(null);
+      return;
+    }
+
+    const source = String(formData.get("source") ?? "manual");
+    const squares = Number(formData.get("squares") ?? 0);
+    const ticks = Number(formData.get("ticks") ?? 0);
+    const totalLengths = Number(formData.get("totalLengths") ?? 0);
+    const distanceM = Number(formData.get("distanceM") ?? 0);
+    const sourceVerificationId = formData.get("sourceVerificationId") ? String(formData.get("sourceVerificationId")) : null;
+    const sourceVerificationLineId = formData.get("sourceVerificationLineId") ? String(formData.get("sourceVerificationLineId")) : null;
+    const sourceSheetEntryId = formData.get("sourceSheetEntryId") ? String(formData.get("sourceSheetEntryId")) : null;
+
+    const nextFinalSelection: FinalSelection = {
+      source: source === "original" || source === "verification" ? source : "manual",
+      sourceVerificationId,
+      sourceVerificationLineId,
+      sourceSheetEntryId,
+      squares,
+      ticks,
+      totalLengths,
+      distanceM,
+      validatedAtLabel: new Date().toLocaleString("fr-FR"),
+      validatedByName: "Vous",
+    };
+
+    setDashboardRounds((previousRounds) =>
+      previousRounds.map((round) => {
+        if (round.roundId !== roundId) return round;
+
+        return {
+          ...round,
+          lanes: round.lanes.map((lane) => {
+            if (lane.laneId !== laneId) return lane;
+
+            return {
+              ...lane,
+              swimmers: lane.swimmers.map((swimmer) => {
+                if (swimmer.swimmerId !== swimmerId) return swimmer;
+                return {
+                  ...swimmer,
+                  finalSelection: nextFinalSelection,
+                };
+              }),
+            };
+          }),
+        };
+      }),
+    );
+
+    setSelectedSwimmer(null);
+  }
+
+  function getSwimmerStatus(swimmer: SwimmerRow) {
+    return swimmer.finalSelection ? "Validé" : swimmer.status;
+  }
 
   return (
     <section className="space-y-4 rounded border bg-white p-4">
@@ -111,7 +184,7 @@ export function VerificationDashboard({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {rounds.map((round) => (
+            {dashboardRounds.map((round) => (
               <tr
                 key={round.roundId}
                 role="button"
@@ -213,16 +286,16 @@ export function VerificationDashboard({
                     <td className="p-2">{swimmer.club}</td>
                     <td className="p-2">{swimmer.section}</td>
                     <td className="p-2">
-                      {swimmer.hasDifferences ? (
+                      {swimmer.hasDifferences || swimmer.finalSelection ? (
                         <button
                           type="button"
                           onClick={() => setSelectedSwimmer(swimmer)}
                           className="rounded border border-amber-500 px-2 py-1 text-amber-700 hover:bg-amber-50"
                         >
-                          {swimmer.status}
+                          {getSwimmerStatus(swimmer)}
                         </button>
                       ) : (
-                        swimmer.status
+                        getSwimmerStatus(swimmer)
                       )}
                     </td>
                   </tr>
@@ -270,7 +343,14 @@ export function VerificationDashboard({
                       <td className="p-2">{selectedSwimmer.originalEntry.totalLengths}</td>
                       <td className="p-2">{selectedSwimmer.originalEntry.distanceM} m</td>
                       <td className="p-2">
-                        <form action={saveFinalResultAction}>
+                        <form
+                          action={saveFinalResultAction}
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            const formData = new FormData(event.currentTarget);
+                            void handleSaveFinalResult(formData);
+                          }}
+                        >
                           <input type="hidden" name="sheetId" value={selectedSwimmer.sheetId} />
                           <input type="hidden" name="roundId" value={selectedSwimmer.roundId} />
                           <input type="hidden" name="laneId" value={selectedSwimmer.laneId} />
@@ -319,7 +399,14 @@ export function VerificationDashboard({
                         <td className="p-2">{line.distanceM} m</td>
                         <td className="p-2">{line.createdAtLabel}</td>
                         <td className="p-2">
-                          <form action={saveFinalResultAction}>
+                          <form
+                            action={saveFinalResultAction}
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              const formData = new FormData(event.currentTarget);
+                              void handleSaveFinalResult(formData);
+                            }}
+                          >
                             <input type="hidden" name="sheetId" value={selectedSwimmer.sheetId} />
                             <input type="hidden" name="roundId" value={selectedSwimmer.roundId} />
                             <input type="hidden" name="laneId" value={selectedSwimmer.laneId} />
