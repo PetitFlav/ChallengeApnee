@@ -164,6 +164,21 @@ export function VerificationDashboard({
     return swimmer.finalSelection ? "Validé" : swimmer.status;
   }
 
+
+  function getSwimmerStatusClassName(swimmer: SwimmerRow) {
+    const status = getSwimmerStatus(swimmer);
+
+    if (status === "Validé") {
+      return "rounded border border-emerald-600 bg-emerald-50 px-2 py-1 text-emerald-700 hover:bg-emerald-100";
+    }
+
+    if (status === "Différence") {
+      return "rounded border border-amber-500 bg-amber-50 px-2 py-1 text-amber-700 hover:bg-amber-100";
+    }
+
+    return "rounded border border-slate-300 bg-slate-50 px-2 py-1 text-slate-700 hover:bg-slate-100";
+  }
+
   return (
     <section className="space-y-4 rounded border bg-white p-4">
       <div>
@@ -290,7 +305,7 @@ export function VerificationDashboard({
                         <button
                           type="button"
                           onClick={() => setSelectedSwimmer(swimmer)}
-                          className="rounded border border-amber-500 px-2 py-1 text-amber-700 hover:bg-amber-50"
+                          className={getSwimmerStatusClassName(swimmer)}
                         >
                           {getSwimmerStatus(swimmer)}
                         </button>
