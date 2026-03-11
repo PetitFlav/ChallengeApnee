@@ -23,6 +23,7 @@ async function main() {
         lanes25Count,
         lanes50Count,
         isActive: true,
+        clubOrganisateur: "Club Organisateur",
       },
     });
   }
@@ -36,6 +37,7 @@ async function main() {
       lanes25Count,
       lanes50Count,
       isActive: true,
+      clubOrganisateur: "Club Organisateur",
     },
   });
 
@@ -68,13 +70,10 @@ async function main() {
           clubId: club.id,
         },
       },
-      update: {
-        isHostClub: club.id === hostClub.id,
-      },
+      update: {},
       create: {
         challengeId: challenge.id,
         clubId: club.id,
-        isHostClub: club.id === hostClub.id,
       },
     });
   }

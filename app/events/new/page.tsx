@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import { buildRoundDefinitions, regenerateEventStructure, sanitizeStartTime } from "@/lib/challenge";
-import { createDefaultEvent, setActiveChallenge } from "@/lib/events";
+import { createDefaultEvent, setActiveChallenge, syncOrganizerClubForChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_EVENT_TIMEZONE } from "@/lib/constants";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
+import { fileToDataUrl } from "@/lib/image";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ async function createEvent(formData: FormData) {
   const lanes25Count = Math.max(0, Number.parseInt(String(formData.get("lanes25Count") || "0"), 10) || 0);
   const lanes50Count = Math.max(0, Number.parseInt(String(formData.get("lanes50Count") || "0"), 10) || 0);
   const shouldActivate = Boolean(formData.get("isActive"));
+  const clubOrganisateur = String(formData.get("clubOrganisateur") || "").trim();
 
   if (durationMinutes <= 1) {
     redirect("/events/new?error=duration");
@@ -47,7 +49,13 @@ async function createEvent(formData: FormData) {
     redirect("/events/new?error=no-lanes");
   }
 
+  if (!clubOrganisateur) {
+    redirect("/events/new?error=clubOrganisateur");
+  }
+
   const eventDate = eventDateRaw ? new Date(`${eventDateRaw}T00:00:00`) : new Date();
+  const logoFile = formData.get("clubOrganisateurLogo");
+  const clubOrganisateurLogo = await fileToDataUrl(logoFile instanceof File ? logoFile : null);
 
   const challenge = await createDefaultEvent({ active: false });
 
@@ -61,6 +69,16 @@ async function createEvent(formData: FormData) {
     lanes25Count,
     lanes50Count,
   });
+
+  await prisma.challenge.update({
+    where: { id: challenge.id },
+    data: {
+      clubOrganisateur,
+      clubOrganisateurLogo,
+    },
+  });
+
+  await syncOrganizerClubForChallenge(challenge.id, clubOrganisateur);
 
   if (shouldActivate) {
     await setActiveChallenge(challenge.id);
@@ -86,6 +104,7 @@ export default function NewEventPage({ searchParams }: { searchParams?: { error?
   const noLanesError = searchParams?.error === "no-lanes";
   const durationError = searchParams?.error === "duration";
   const roundsError = searchParams?.error === "rounds";
+  const organizerError = searchParams?.error === "clubOrganisateur";
 
   return (
     <div className="space-y-6">
@@ -128,44 +147,35 @@ export default function NewEventPage({ searchParams }: { searchParams?: { error?
           <span className="text-sm font-medium text-slate-700">Nombre de lignes 50m</span>
           <input type="number" name="lanes50Count" min={0} defaultValue={0} required className="w-full rounded border p-2" />
         </label>
+        <label className="space-y-1 md:col-span-2">
+          <span className="text-sm font-medium text-slate-700">Club organisateur</span>
+          <input name="clubOrganisateur" required className="w-full rounded border p-2" />
+        </label>
+        <label className="space-y-1 md:col-span-2">
+          <span className="text-sm font-medium text-slate-700">Logo du club organisateur (optionnel)</span>
+          <input type="file" name="clubOrganisateurLogo" accept="image/*" className="w-full rounded border p-2" />
+        </label>
         <label className="flex items-center gap-2 md:col-span-2">
           <input type="checkbox" name="isActive" defaultChecked />
           <span className="text-sm text-slate-700">Activer cet événement après création</span>
         </label>
 
-        {noLanesError ? (
-          <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700 md:col-span-2">
-            Aucun bassin configuré. Renseignez au moins une ligne 25m ou 50m.
-          </div>
-        ) : null}
-
-        {durationError ? (
-          <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700 md:col-span-2">
-            La durée doit être supérieure à 1 minute.
-          </div>
-        ) : null}
-
-        {roundsError ? (
-          <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700 md:col-span-2">
-            Le nombre de tournées doit être supérieur ou égal à 1.
-          </div>
-        ) : null}
+        {noLanesError ? <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700 md:col-span-2">Aucun bassin configuré. Renseignez au moins une ligne 25m ou 50m.</div> : null}
+        {durationError ? <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700 md:col-span-2">La durée doit être supérieure à 1 minute.</div> : null}
+        {roundsError ? <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700 md:col-span-2">Le nombre de tournées doit être supérieur ou égal à 1.</div> : null}
+        {organizerError ? <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700 md:col-span-2">Le club organisateur est obligatoire.</div> : null}
 
         <div className="space-y-2 rounded border border-slate-200 bg-slate-50 p-3 text-sm md:col-span-2">
           <p className="font-medium text-slate-700">Tournées prévues (exemple)</p>
           <ul className="space-y-1 text-slate-600">
             {roundPreview.map((round) => (
-              <li key={round.roundNumber}>
-                {round.label} — {round.scheduledTime}
-              </li>
+              <li key={round.roundNumber}>{round.label} — {round.scheduledTime}</li>
             ))}
           </ul>
         </div>
 
         <div className="md:col-span-2">
-          <button type="submit" className="rounded bg-blue-600 px-4 py-2 text-white">
-            Créer
-          </button>
+          <button type="submit" className="rounded bg-blue-600 px-4 py-2 text-white">Créer</button>
         </div>
       </form>
     </div>

@@ -39,10 +39,39 @@ export async function createDefaultEvent(options?: { active?: boolean }) {
       lanes50Count: DEFAULT_LANES_50_COUNT,
       isActive: options?.active ?? true,
       isArchived: false,
+      clubOrganisateur: "",
+      clubOrganisateurLogo: null,
     },
   });
 }
 
+
+export async function syncOrganizerClubForChallenge(challengeId: string, clubOrganisateur: string) {
+  const organizerName = clubOrganisateur.trim();
+  if (!organizerName) return null;
+
+  const club = await prisma.club.upsert({
+    where: { name: organizerName },
+    update: {},
+    create: { name: organizerName },
+  });
+
+  await prisma.challengeClub.upsert({
+    where: {
+      challengeId_clubId: {
+        challengeId,
+        clubId: club.id,
+      },
+    },
+    update: {},
+    create: {
+      challengeId,
+      clubId: club.id,
+    },
+  });
+
+  return club;
+}
 export async function ensureActiveChallenge() {
   const active = await prisma.challenge.findFirst({
     where: { isActive: true, isArchived: false },
