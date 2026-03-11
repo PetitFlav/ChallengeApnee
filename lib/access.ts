@@ -9,6 +9,8 @@ type SessionUser = {
 export const NO_ACTIVE_CHALLENGE_ACCESS_MESSAGE = "Aucun événement actif ne vous est accessible actuellement.";
 export const NO_CHALLENGE_ACCESS_MESSAGE = "Aucun événement ne vous est accessible actuellement.";
 export const UNAUTHORIZED_MODULE_ACCESS_MESSAGE = "Accès non autorisé à cette fonctionnalité.";
+export const POST_CLOSURE_MODULE_ACCESS_MESSAGE =
+  "Accès limité après clôture : seuls Vérification et Dashboard restent disponibles.";
 
 export function canAccessRestrictedModules(user: SessionUser) {
   return user.isSuperUser;
@@ -114,4 +116,19 @@ export async function requirePreferredChallengeForUser(user: SessionUser) {
     redirect("/events?message=forbidden");
   }
   return challenge;
+}
+
+export async function isPostClosureRestrictedUser(user: SessionUser) {
+  if (user.isSuperUser) {
+    return false;
+  }
+
+  const challenge = await ensurePreferredChallengeForUser(user);
+  return Boolean(challenge?.closedAt);
+}
+
+export async function requireAccessBeforeClosure(user: SessionUser) {
+  if (await isPostClosureRestrictedUser(user)) {
+    redirect("/?message=post-closure-restricted");
+  }
 }

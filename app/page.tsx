@@ -6,6 +6,8 @@ import {
   ensurePreferredChallengeForUser,
   NO_CHALLENGE_ACCESS_MESSAGE,
   UNAUTHORIZED_MODULE_ACCESS_MESSAGE,
+  POST_CLOSURE_MODULE_ACCESS_MESSAGE,
+  isPostClosureRestrictedUser,
 } from "@/lib/access";
 import { LogoutButton } from "@/app/logout-button";
 
@@ -27,6 +29,7 @@ export default async function HomePage({ searchParams }: { searchParams?: { mess
   const challenge = await ensurePreferredChallengeForUser(user);
   const hasChallengeAccess = Boolean(challenge);
   const hasRestrictedModulesAccess = canAccessRestrictedModules(user);
+  const isPostClosureRestricted = await isPostClosureRestrictedUser(user);
 
   return (
     <div className="space-y-4">
@@ -52,10 +55,18 @@ export default async function HomePage({ searchParams }: { searchParams?: { mess
         </div>
       ) : null}
 
+      {searchParams?.message === "post-closure-restricted" ? (
+        <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          {POST_CLOSURE_MODULE_ACCESS_MESSAGE}
+        </div>
+      ) : null}
+
       <nav className="grid gap-2 sm:grid-cols-2">
         {links.map((link) => {
           const isDisabled =
-            !hasChallengeAccess || (link.restricted && !hasRestrictedModulesAccess);
+            !hasChallengeAccess ||
+            (link.restricted && !hasRestrictedModulesAccess) ||
+            (isPostClosureRestricted && (link.href === "/events" || link.href === "/swimmers"));
 
           if (isDisabled) {
             return (

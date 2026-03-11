@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { DEFAULT_EVENT_TIMEZONE } from "@/lib/constants";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import { requireSessionUser } from "@/lib/auth";
-import { requireSuperUser } from "@/lib/access";
+import { requireAccessBeforeClosure, requireSuperUser } from "@/lib/access";
 import { fileToDataUrl } from "@/lib/image";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +27,7 @@ async function createEvent(formData: FormData) {
   if (!hasDatabaseUrl) return;
 
   const user = await requireSessionUser();
+  await requireAccessBeforeClosure(user);
   await requireSuperUser(user, "/events?message=forbidden-create");
 
   const name = String(formData.get("name") || "").trim() || "Challenge Apnée";
@@ -106,6 +107,7 @@ export default async function NewEventPage({ searchParams }: { searchParams?: { 
   }
 
   const user = await requireSessionUser();
+  await requireAccessBeforeClosure(user);
   await requireSuperUser(user, "/events?message=forbidden-create");
 
   const roundPreview = buildRoundDefinitions("09:30", 120, 4);

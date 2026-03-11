@@ -17,7 +17,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import { requireSessionUser } from "@/lib/auth";
-import { getUserAccessibleChallenges, requireChallengeAccess } from "@/lib/access";
+import { getUserAccessibleChallenges, requireAccessBeforeClosure, requireChallengeAccess } from "@/lib/access";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +38,7 @@ async function activateEvent(formData: FormData) {
   if (!hasDatabaseUrl) return;
 
   const user = await requireSessionUser();
+  await requireAccessBeforeClosure(user);
   const id = String(formData.get("id") || "").trim();
   if (!id) return;
 
@@ -64,6 +65,7 @@ async function toggleArchiveEvent(formData: FormData) {
   if (!hasDatabaseUrl) return;
 
   const user = await requireSessionUser();
+  await requireAccessBeforeClosure(user);
   const id = String(formData.get("id") || "").trim();
   const currentValue = String(formData.get("isArchived") || "").trim();
   if (!id) return;
@@ -92,6 +94,7 @@ async function closeEvent(formData: FormData) {
   if (!hasDatabaseUrl) return;
 
   const user = await requireSessionUser();
+  await requireAccessBeforeClosure(user);
   const id = String(formData.get("id") || "").trim();
   if (!id) return;
 
@@ -120,6 +123,7 @@ async function deleteEvent(formData: FormData) {
   if (!hasDatabaseUrl) return;
 
   const user = await requireSessionUser();
+  await requireAccessBeforeClosure(user);
   const id = String(formData.get("id") || "").trim();
   if (!id) return;
 
@@ -165,6 +169,7 @@ export default async function EventsPage({
   }
 
   const user = await requireSessionUser();
+  await requireAccessBeforeClosure(user);
 
   const [events, distanceByChallenge] = await Promise.all([
     getUserAccessibleChallenges(user),

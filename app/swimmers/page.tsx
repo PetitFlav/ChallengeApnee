@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { requireSessionUser } from "@/lib/auth";
-import { requirePreferredChallengeForUser } from "@/lib/access";
+import { requireAccessBeforeClosure, requirePreferredChallengeForUser } from "@/lib/access";
 import { ARCHIVED_READ_ONLY_MESSAGE, assertChallengeWritable, ensureActiveChallenge, syncOrganizerClubForChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
@@ -373,7 +373,8 @@ export default async function SwimmersPage({
 
   try {
     const user = await requireSessionUser();
-  const challenge = await requirePreferredChallengeForUser(user);
+    await requireAccessBeforeClosure(user);
+    const challenge = await requirePreferredChallengeForUser(user);
     const isArchived = challenge.isArchived;
     const organizerClub = await syncOrganizerClubForChallenge(challenge.id, challenge.clubOrganisateur);
 
