@@ -120,10 +120,141 @@ export default async function DashboardPage() {
       revalidatePath("/dashboard");
     }
 
-    const [total, validatedSheetsCount, rounds, finalResults] = await Promise.all([
-      prisma.sheetEntry.aggregate({
+    async function transferConformingLines() {
+      "use server";
+
+      const user = await requireSessionUser();
+      await requireRestrictedModulesAccess(user);
+      const challenge = await requireActiveChallengeForUser(user);
+
+      const sheets = await prisma.sheet.findMany({
+        where: { challengeId: challenge.id },
+        select: {
+          id: true,
+          roundId: true,
+          laneId: true,
+          entries: {
+            select: {
+              id: true,
+              swimmerId: true,
+              squares: true,
+              ticks: true,
+              totalLengths: true,
+              distanceM: true,
+              swimmer: { select: { clubId: true, sectionId: true } },
+            },
+          },
+          verifications: {
+            select: {
+              lines: {
+                select: {
+                  id: true,
+                  verificationId: true,
+                  swimmerId: true,
+                  squares: true,
+                  ticks: true,
+                  totalLengths: true,
+                  distanceM: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const upserts: Array<ReturnType<typeof prisma.finalResult.upsert>> = [];
+
+      for (const sheet of sheets) {
+        const verificationLinesBySwimmer = new Map<string, Array<(typeof sheet.verifications)[number]["lines"][number]>>();
+
+        for (const verification of sheet.verifications) {
+          for (const line of verification.lines) {
+            const existing = verificationLinesBySwimmer.get(line.swimmerId) ?? [];
+            existing.push(line);
+            verificationLinesBySwimmer.set(line.swimmerId, existing);
+          }
+        }
+
+        for (const entry of sheet.entries) {
+          const verificationLines = verificationLinesBySwimmer.get(entry.swimmerId) ?? [];
+
+          if (verificationLines.length === 0) {
+            continue;
+          }
+
+          const allConforming = verificationLines.every(
+            (line) => line.squares === entry.squares && line.ticks === entry.ticks,
+          );
+
+          if (!allConforming) {
+            continue;
+          }
+
+          const firstVerificationLine = verificationLines[0] ?? null;
+
+          upserts.push(
+            prisma.finalResult.upsert({
+              where: {
+                challengeId_roundId_laneId_swimmerId: {
+                  challengeId: challenge.id,
+                  roundId: sheet.roundId,
+                  laneId: sheet.laneId,
+                  swimmerId: entry.swimmerId,
+                },
+              },
+              update: {
+                sheetId: sheet.id,
+                clubId: entry.swimmer.clubId,
+                sectionId: entry.swimmer.sectionId,
+                source: "original",
+                sourceVerificationId: firstVerificationLine?.verificationId ?? null,
+                sourceVerificationLineId: firstVerificationLine?.id ?? null,
+                sourceSheetEntryId: entry.id,
+                squares: entry.squares,
+                ticks: entry.ticks,
+                totalLengths: entry.totalLengths,
+                distanceM: entry.distanceM,
+                validatedByUserId: user.id,
+                validatedAt: new Date(),
+              },
+              create: {
+                challengeId: challenge.id,
+                roundId: sheet.roundId,
+                laneId: sheet.laneId,
+                sheetId: sheet.id,
+                swimmerId: entry.swimmerId,
+                clubId: entry.swimmer.clubId,
+                sectionId: entry.swimmer.sectionId,
+                source: "original",
+                sourceVerificationId: firstVerificationLine?.verificationId ?? null,
+                sourceVerificationLineId: firstVerificationLine?.id ?? null,
+                sourceSheetEntryId: entry.id,
+                squares: entry.squares,
+                ticks: entry.ticks,
+                totalLengths: entry.totalLengths,
+                distanceM: entry.distanceM,
+                validatedByUserId: user.id,
+              },
+            }),
+          );
+        }
+      }
+
+      if (upserts.length > 0) {
+        await prisma.$transaction(upserts);
+      }
+
+      revalidatePath("/dashboard");
+    }
+
+    const [sheetEntries, validatedSheetsCount, rounds, finalResults] = await Promise.all([
+      prisma.sheetEntry.findMany({
         where: { sheet: { challengeId: challenge.id } },
-        _sum: { distanceM: true },
+        select: {
+          swimmerId: true,
+          distanceM: true,
+          sheet: { select: { roundId: true, laneId: true } },
+        },
       }),
       prisma.sheet.count({
         where: { challengeId: challenge.id, status: "VALIDATED" },
@@ -208,6 +339,18 @@ export default async function DashboardPage() {
         },
       }),
     ]);
+
+    const initialDistanceByKey = new Map(
+      sheetEntries.map((entry) => [`${entry.sheet.roundId}-${entry.sheet.laneId}-${entry.swimmerId}`, entry.distanceM]),
+    );
+    const finalDistanceByKey = new Map(finalResults.map((result) => [`${result.roundId}-${result.laneId}-${result.swimmerId}`, result.distanceM]));
+
+    const allLineKeys = new Set([...initialDistanceByKey.keys(), ...finalDistanceByKey.keys()]);
+
+    let distanceM = 0;
+    for (const key of allLineKeys) {
+      distanceM += finalDistanceByKey.get(key) ?? initialDistanceByKey.get(key) ?? 0;
+    }
 
     const finalResultByKey = new Map(
       finalResults.map((result) => [
@@ -353,8 +496,33 @@ export default async function DashboardPage() {
       };
     });
 
-    const distanceM = total._sum.distanceM ?? 0;
     const distanceKm = distanceM / 1000;
+
+    const totalLines = sheetEntries.length;
+    const verifiedLines = rounds.reduce(
+      (sum, round) =>
+        sum +
+        round.sheets.reduce((sheetSum, sheet) => {
+          const latestVerification = sheet.verifications[0] ?? null;
+          if (!latestVerification) return sheetSum;
+
+          const originalSwimmerIds = new Set(sheet.entries.map((entry) => entry.swimmer.id));
+          const verifiedCount = latestVerification.lines.filter((line) => originalSwimmerIds.has(line.swimmer.id)).length;
+          return sheetSum + verifiedCount;
+        }, 0),
+      0,
+    );
+    const linesToVerify = Math.max(totalLines - verifiedLines, 0);
+    const finalValidatedLines = finalResults.length;
+    const remainingDifferences = verificationRounds.reduce(
+      (sum, round) =>
+        sum +
+        round.lanes.reduce(
+          (laneSum, lane) => laneSum + lane.swimmers.filter((swimmer) => swimmer.hasDifferences && !swimmer.finalSelection).length,
+          0,
+        ),
+      0,
+    );
 
     return (
       <div className="space-y-6">
@@ -384,7 +552,18 @@ export default async function DashboardPage() {
           </article>
         </section>
 
-        <VerificationDashboard rounds={verificationRounds} saveFinalResultAction={saveFinalResult} />
+        <VerificationDashboard
+          rounds={verificationRounds}
+          summary={{
+            totalLines,
+            verifiedLines,
+            linesToVerify,
+            finalValidatedLines,
+            remainingDifferences,
+          }}
+          saveFinalResultAction={saveFinalResult}
+          transferConformingLinesAction={transferConformingLines}
+        />
       </div>
     );
   } catch {

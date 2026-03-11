@@ -73,12 +73,24 @@ type RoundRow = {
   lanes: LaneRow[];
 };
 
+type DashboardSummary = {
+  totalLines: number;
+  verifiedLines: number;
+  linesToVerify: number;
+  finalValidatedLines: number;
+  remainingDifferences: number;
+};
+
 export function VerificationDashboard({
   rounds,
+  summary,
   saveFinalResultAction,
+  transferConformingLinesAction,
 }: {
   rounds: RoundRow[];
+  summary: DashboardSummary;
   saveFinalResultAction: (formData: FormData) => Promise<void>;
+  transferConformingLinesAction: () => Promise<void>;
 }) {
   const [dashboardRounds, setDashboardRounds] = useState(rounds);
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
@@ -181,9 +193,39 @@ export function VerificationDashboard({
 
   return (
     <section className="space-y-4 rounded border bg-white p-4">
-      <div>
-        <h2 className="text-xl font-semibold text-slate-900">Contrôle des vérifications</h2>
-        <p className="text-sm text-slate-600">Navigation en 3 niveaux : tournée → ligne → nageurs.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">Contrôle des vérifications</h2>
+          <p className="text-sm text-slate-600">Navigation en 3 niveaux : tournée → ligne → nageurs.</p>
+        </div>
+        <form action={transferConformingLinesAction}>
+          <button type="submit" className="rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+            Transférer les lignes conformes
+          </button>
+        </form>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-5">
+        <article className="rounded border bg-slate-50 p-3">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Lignes totales saisies</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-900">{summary.totalLines}</p>
+        </article>
+        <article className="rounded border bg-slate-50 p-3">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Lignes vérifiées</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-900">{summary.verifiedLines}</p>
+        </article>
+        <article className="rounded border bg-slate-50 p-3">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Lignes à vérifier</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-900">{summary.linesToVerify}</p>
+        </article>
+        <article className="rounded border bg-emerald-50 p-3">
+          <p className="text-xs uppercase tracking-wide text-emerald-700">Lignes finales validées</p>
+          <p className="mt-1 text-2xl font-semibold text-emerald-900">{summary.finalValidatedLines}</p>
+        </article>
+        <article className="rounded border bg-amber-50 p-3">
+          <p className="text-xs uppercase tracking-wide text-amber-700">Différences restantes</p>
+          <p className="mt-1 text-2xl font-semibold text-amber-900">{summary.remainingDifferences}</p>
+        </article>
       </div>
 
       <div className="overflow-x-auto rounded border">
