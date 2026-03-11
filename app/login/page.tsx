@@ -29,19 +29,11 @@ export default async function LoginPage({ searchParams }: { searchParams?: { err
     redirect("/");
   }
 
-
-
-async function mockLogin() {
-  "use server";
-  redirect("/login/success");
-}
-
-export default function LoginPage() {
   return (
     <div className="mx-auto mt-10 max-w-md space-y-6 rounded border bg-white p-6">
       <div>
         <h1 className="text-2xl font-semibold">Connexion</h1>
-        <p className="text-sm text-slate-600">Connectez-vous avec votre email et mot de passe.</p>
+        <p className="text-sm text-slate-600">Connectez-vous avec votre email et votre mot de passe.</p>
       </div>
 
       {searchParams?.error === "invalid" ? (
@@ -61,10 +53,6 @@ export default function LoginPage() {
         </label>
 
         <button type="submit" className="w-full rounded bg-blue-600 px-4 py-2 text-white">
-        <p className="text-slate-600">Écran de connexion simplifié pour la V1.</p>
-      </div>
-      <form action={mockLogin}>
-        <button type="submit" className="rounded bg-blue-600 px-4 py-2 text-white">
           Se connecter
         </button>
       </form>
