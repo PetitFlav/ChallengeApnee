@@ -6,16 +6,18 @@ import {
   ensurePreferredChallengeForUser,
   NO_CHALLENGE_ACCESS_MESSAGE,
   UNAUTHORIZED_MODULE_ACCESS_MESSAGE,
+  POST_CLOSURE_MODULE_ACCESS_MESSAGE,
+  isPostClosureRestrictedUser,
 } from "@/lib/access";
 import { LogoutButton } from "@/app/logout-button";
 
 const links = [
-  { href: "/events", label: "Événements", restricted: false },
-  { href: "/swimmers", label: "Nageurs", restricted: false },
-  { href: "/sheets", label: "Vérification", restricted: true },
-  { href: "/sheets/new", label: "Saisie des longueurs", restricted: true },
-  { href: "/dashboard", label: "Dashboard", restricted: true },
-  { href: "/public", label: "Écran public", restricted: true },
+  { href: "/events", label: "Événements", access: "superuser" },
+  { href: "/swimmers", label: "Nageurs", access: "superuser" },
+  { href: "/sheets", label: "Vérification", access: "event-user" },
+  { href: "/sheets/new", label: "Saisie des longueurs", access: "superuser" },
+  { href: "/dashboard", label: "Dashboard", access: "event-user" },
+  { href: "/public", label: "Écran public", access: "superuser" },
 ] as const;
 
 export default async function HomePage({ searchParams }: { searchParams?: { message?: string } }) {
@@ -26,7 +28,8 @@ export default async function HomePage({ searchParams }: { searchParams?: { mess
 
   const challenge = await ensurePreferredChallengeForUser(user);
   const hasChallengeAccess = Boolean(challenge);
-  const hasRestrictedModulesAccess = canAccessRestrictedModules(user);
+  const hasSuperUserAccess = canAccessRestrictedModules(user);
+  const isPostClosureRestricted = await isPostClosureRestrictedUser(user);
 
   return (
     <div className="space-y-4">
@@ -52,10 +55,18 @@ export default async function HomePage({ searchParams }: { searchParams?: { mess
         </div>
       ) : null}
 
+      {searchParams?.message === "post-closure-restricted" ? (
+        <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          {POST_CLOSURE_MODULE_ACCESS_MESSAGE}
+        </div>
+      ) : null}
+
       <nav className="grid gap-2 sm:grid-cols-2">
         {links.map((link) => {
           const isDisabled =
-            !hasChallengeAccess || (link.restricted && !hasRestrictedModulesAccess);
+            !hasChallengeAccess ||
+            (link.access === "superuser" && !hasSuperUserAccess) ||
+            (isPostClosureRestricted && (link.href === "/events" || link.href === "/swimmers"));
 
           if (isDisabled) {
             return (

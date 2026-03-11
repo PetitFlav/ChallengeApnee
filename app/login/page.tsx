@@ -1,3 +1,4 @@
+import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import { redirect } from "next/navigation";
 import { authenticateUser, getSessionUser, setSession } from "@/lib/auth";
 
@@ -32,7 +33,7 @@ export default async function LoginPage({ searchParams }: { searchParams?: { err
     <div className="mx-auto mt-10 max-w-md space-y-6 rounded border bg-white p-6">
       <div>
         <h1 className="text-2xl font-semibold">Connexion</h1>
-        <p className="text-sm text-slate-600">Connectez-vous avec votre email et mot de passe.</p>
+        <p className="text-sm text-slate-600">Connectez-vous avec votre email et votre mot de passe.</p>
       </div>
 
       {searchParams?.error === "invalid" ? (

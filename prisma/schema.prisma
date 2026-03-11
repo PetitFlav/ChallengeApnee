@@ -21,6 +21,8 @@ model Challenge {
   roundsCount     Int             @default(4)
   lanes25Count    Int             @default(4)
   lanes50Count    Int             @default(6)
+  clubOrganisateur String         @default("")
+  clubOrganisateurLogo String?
   isActive        Boolean         @default(false)
   isArchived      Boolean         @default(false)
   closedAt        DateTime?
@@ -82,7 +84,6 @@ model ChallengeClub {
   id          String    @id @default(cuid())
   challengeId String
   clubId      String
-  isHostClub  Boolean   @default(false)
   createdAt   DateTime  @default(now())
 
   challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)

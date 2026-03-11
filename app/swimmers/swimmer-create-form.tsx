@@ -14,10 +14,11 @@ type Props = {
   sections: Array<{ id: string; name: string }>;
   defaultNumber: number;
   action: (state: CreateSwimmerState, formData: FormData) => Promise<CreateSwimmerState>;
+  defaultClubId?: string;
   disabled?: boolean;
 };
 
-export function SwimmerCreateForm({ clubs, sections, defaultNumber, action, disabled = false }: Props) {
+export function SwimmerCreateForm({ clubs, sections, defaultNumber, action, defaultClubId = "", disabled = false }: Props) {
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction] = useFormState(action, {
     error: null,
@@ -34,7 +35,12 @@ export function SwimmerCreateForm({ clubs, sections, defaultNumber, action, disa
     if (numberPreview) {
       numberPreview.value = String(state.nextNumber);
     }
-  }, [state.nextNumber, state.success]);
+
+    const clubSelect = formRef.current?.elements.namedItem("clubId") as HTMLSelectElement | null;
+    if (clubSelect) {
+      clubSelect.value = defaultClubId;
+    }
+  }, [defaultClubId, state.nextNumber, state.success]);
 
   return (
     <form ref={formRef} action={formAction} className="grid gap-3 md:grid-cols-6">
@@ -49,7 +55,7 @@ export function SwimmerCreateForm({ clubs, sections, defaultNumber, action, disa
       <input name="firstName" disabled={disabled} placeholder="Prénom" required className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
       <input name="lastName" disabled={disabled} placeholder="Nom" required className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
       <input name="email" disabled={disabled} type="email" placeholder="Email" required className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
-      <select name="clubId" disabled={disabled} className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100">
+      <select name="clubId" defaultValue={defaultClubId} disabled={disabled} className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100">
         <option value="">Sans club</option>
         {clubs.map((club) => (
           <option key={club.id} value={club.id}>
