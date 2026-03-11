@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
-import { ARCHIVED_READ_ONLY_MESSAGE, assertChallengeWritable, ensureActiveChallenge } from "@/lib/events";
+import { ARCHIVED_READ_ONLY_MESSAGE, assertChallengeWritable, ensureActiveChallenge, syncOrganizerClubForChallenge } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import { SwimmerCreateForm } from "./swimmer-create-form";
@@ -252,7 +252,6 @@ async function createClub(formData: FormData) {
     create: {
       challengeId: challenge.id,
       clubId: club.id,
-      isHostClub: false,
     },
   });
 
@@ -267,59 +266,29 @@ async function deleteClub(formData: FormData) {
   const challenge = await ensureActiveChallenge();
   await assertChallengeWritable(challenge.id);
 
-  await prisma.challengeClub.delete({
-    where: {
-      challengeId_clubId: {
-        challengeId: challenge.id,
-        clubId: String(formData.get("id")),
-      },
-    },
-  });
-  revalidatePath("/swimmers");
-}
-
-
-async function toggleHostClub(formData: FormData) {
-  "use server";
-
-  if (!hasDatabaseUrl) return;
-
-  const challenge = await ensureActiveChallenge();
-  await assertChallengeWritable(challenge.id);
-
   const clubId = String(formData.get("id") || "").trim();
-  const isHostClub = Boolean(formData.get("isHostClub"));
   if (!clubId) return;
 
-  const participantClub = await prisma.challengeClub.findUnique({
+  const linkedClub = await prisma.challengeClub.findUnique({
     where: {
       challengeId_clubId: {
         challengeId: challenge.id,
         clubId,
       },
     },
-    select: { id: true },
+    include: { club: true },
   });
 
-  if (!participantClub) return;
+  if (!linkedClub) return;
+  if (linkedClub.club.name === challenge.clubOrganisateur) return;
 
-  await prisma.$transaction(async (tx) => {
-    if (isHostClub) {
-      await tx.challengeClub.updateMany({
-        where: { challengeId: challenge.id },
-        data: { isHostClub: false },
-      });
-    }
-
-    await tx.challengeClub.update({
-      where: {
-        challengeId_clubId: {
-          challengeId: challenge.id,
-          clubId,
-        },
+  await prisma.challengeClub.delete({
+    where: {
+      challengeId_clubId: {
+        challengeId: challenge.id,
+        clubId,
       },
-      data: { isHostClub },
-    });
+    },
   });
 
   revalidatePath("/swimmers");
@@ -375,6 +344,7 @@ export default async function SwimmersPage({
   try {
     const challenge = await ensureActiveChallenge();
     const isArchived = challenge.isArchived;
+    const organizerClub = await syncOrganizerClubForChallenge(challenge.id, challenge.clubOrganisateur);
 
     const searchNumber = Number(query);
     const hasSearchNumber = !Number.isNaN(searchNumber);
@@ -411,11 +381,7 @@ export default async function SwimmersPage({
     ]);
 
     const clubs = challengeClubs.map(({ club }) => club);
-    const clubsWithHostFlag = challengeClubs.map((challengeClub) => ({
-      id: challengeClub.club.id,
-      name: challengeClub.club.name,
-      isHostClub: challengeClub.isHostClub,
-    }));
+    const defaultClubId = organizerClub?.id ?? "";
 
     const totalPages = Math.max(Math.ceil(swimmersCount / SWIMMERS_PER_PAGE), 1);
     const hasPreviousPage = currentPage > 1;
@@ -446,6 +412,7 @@ export default async function SwimmersPage({
           sections={sections}
           defaultNumber={nextSwimmerNumber}
           action={createSwimmer}
+          defaultClubId={defaultClubId}
           disabled={isArchived}
         />
       </section>
@@ -542,34 +509,24 @@ export default async function SwimmersPage({
             </button>
           </form>
           <ul className="space-y-2">
-            {clubsWithHostFlag.map((club) => (
-              <li key={club.id} className="flex items-center justify-between rounded border p-2 text-sm">
-                <div className="flex items-center gap-3">
-                  <span>{club.name}</span>
-                  <form action={toggleHostClub} className="flex items-center gap-1">
+            {clubs.map((club) => {
+              const isOrganizerClub = club.name === challenge.clubOrganisateur;
+
+              return (
+                <li key={club.id} className="flex items-center justify-between rounded border p-2 text-sm">
+                  <div className="flex items-center gap-3">
+                    <span>{club.name}</span>
+                    {isOrganizerClub ? <span className="text-xs font-medium text-emerald-700">(organisateur)</span> : null}
+                  </div>
+                  <form action={deleteClub}>
                     <input type="hidden" name="id" value={club.id} />
-                    <input
-                      type="checkbox"
-                      name="isHostClub"
-                      value="true"
-                      defaultChecked={club.isHostClub}
-                      disabled={isArchived}
-                    />
-                    <span className="text-xs text-slate-600">Club organisateur</span>
-                    <button type="submit" disabled={isArchived} className="rounded border px-2 py-0.5 text-xs disabled:cursor-not-allowed disabled:bg-slate-100">
-                      Appliquer
+                    <button className="rounded bg-red-600 px-2 py-1 text-white disabled:cursor-not-allowed disabled:bg-slate-400" type="submit" disabled={isArchived || isOrganizerClub}>
+                      Supprimer
                     </button>
                   </form>
-                  {club.isHostClub ? <span className="text-xs font-medium text-emerald-700">(organisateur)</span> : null}
-                </div>
-                <form action={deleteClub}>
-                  <input type="hidden" name="id" value={club.id} />
-                  <button className="rounded bg-red-600 px-2 py-1 text-white disabled:cursor-not-allowed disabled:bg-slate-400" type="submit" disabled={isArchived}>
-                    Supprimer
-                  </button>
-                </form>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </div>
         <div className="rounded border bg-white p-4">
