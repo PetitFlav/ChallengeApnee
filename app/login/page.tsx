@@ -1,3 +1,4 @@
+import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import { redirect } from "next/navigation";
 import { authenticateUser, getSessionUser, setSession } from "@/lib/auth";
 
@@ -28,7 +29,7 @@ export default async function LoginPage({ searchParams }: { searchParams?: { err
     redirect("/");
   }
 
-import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
+
 
 async function mockLogin() {
   "use server";

@@ -1,6 +1,5 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
-import { ARCHIVED_READ_ONLY_MESSAGE, assertChallengeWritable } from "@/lib/events";
 import { requireSessionUser } from "@/lib/auth";
 import { requirePreferredChallengeForUser } from "@/lib/access";
 import { ARCHIVED_READ_ONLY_MESSAGE, assertChallengeWritable, ensureActiveChallenge, syncOrganizerClubForChallenge } from "@/lib/events";
