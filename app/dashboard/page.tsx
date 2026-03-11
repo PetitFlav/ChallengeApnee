@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { requireSessionUser } from "@/lib/auth";
-import { requireActiveChallengeForUser, requireRestrictedModulesAccess } from "@/lib/access";
+import { requireActiveChallengeForUser } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import {
@@ -26,8 +26,6 @@ const hasDatabaseUrl = (() => {
 
 export default async function DashboardPage() {
   const user = await requireSessionUser();
-  await requireRestrictedModulesAccess(user);
-
   if (!hasDatabaseUrl) {
     return (
       <div className="space-y-4">
@@ -47,7 +45,6 @@ export default async function DashboardPage() {
       "use server";
 
       const user = await requireSessionUser();
-      await requireRestrictedModulesAccess(user);
       const challenge = await requireActiveChallengeForUser(user);
 
       const sheetId = String(formData.get("sheetId") ?? "");
@@ -124,7 +121,6 @@ export default async function DashboardPage() {
       "use server";
 
       const user = await requireSessionUser();
-      await requireRestrictedModulesAccess(user);
       const challenge = await requireActiveChallengeForUser(user);
 
       const sheets = await prisma.sheet.findMany({
