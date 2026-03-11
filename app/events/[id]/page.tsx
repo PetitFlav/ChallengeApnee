@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -8,12 +9,14 @@ import {
   assertChallengeWritable,
   closeChallenge,
   setActiveChallenge,
+  syncOrganizerClubForChallenge,
 } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_EVENT_TIMEZONE } from "@/lib/constants";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import { requireSessionUser } from "@/lib/auth";
 import { requireChallengeAccess } from "@/lib/access";
+import { fileToDataUrl } from "@/lib/image";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +53,8 @@ async function saveEventConfiguration(formData: FormData) {
   const lanes25Count = Math.max(0, Number.parseInt(String(formData.get("lanes25Count") || "0"), 10) || 0);
   const lanes50Count = Math.max(0, Number.parseInt(String(formData.get("lanes50Count") || "0"), 10) || 0);
   const shouldActivate = Boolean(formData.get("isActive"));
+  const clubOrganisateur = String(formData.get("clubOrganisateur") || "").trim();
+  const removeClubLogo = Boolean(formData.get("removeClubLogo"));
 
   if (durationMinutes <= 1) {
     redirect(`/events/${challengeId}?error=duration`);
@@ -61,6 +66,10 @@ async function saveEventConfiguration(formData: FormData) {
 
   if (lanes25Count === 0 && lanes50Count === 0) {
     redirect(`/events/${challengeId}?error=no-lanes`);
+  }
+
+  if (!clubOrganisateur) {
+    redirect(`/events/${challengeId}?error=clubOrganisateur`);
   }
 
   const eventDate = eventDateRaw ? new Date(`${eventDateRaw}T00:00:00`) : new Date();
@@ -87,6 +96,20 @@ async function saveEventConfiguration(formData: FormData) {
       lanes25Count,
       lanes50Count,
     });
+
+    const logoFile = formData.get("clubOrganisateurLogo");
+    const uploadedLogo = await fileToDataUrl(logoFile instanceof File ? logoFile : null);
+
+    await prisma.challenge.update({
+      where: { id: challengeId },
+      data: {
+        clubOrganisateur,
+        ...(removeClubLogo ? { clubOrganisateurLogo: null } : {}),
+        ...(uploadedLogo ? { clubOrganisateurLogo: uploadedLogo } : {}),
+      },
+    });
+
+    await syncOrganizerClubForChallenge(challengeId, clubOrganisateur);
 
     if (shouldActivate) {
       await setActiveChallenge(challengeId);
@@ -176,6 +199,7 @@ export default async function EventDetailPage({
   const closedError = searchParams?.error === "closed";
   const durationError = searchParams?.error === "duration";
   const roundsError = searchParams?.error === "rounds";
+  const organizerError = searchParams?.error === "clubOrganisateur";
   const closedMessage = searchParams?.message === "closed";
   const roundPreview =
     challenge.rounds.length > 0
@@ -251,6 +275,25 @@ export default async function EventDetailPage({
           <span className="text-sm font-medium text-slate-700">Nombre de lignes 50m</span>
           <input type="number" name="lanes50Count" min={0} defaultValue={challenge.lanes50Count} required disabled={challenge.isArchived || Boolean(challenge.closedAt)} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
         </label>
+        <label className="space-y-1 md:col-span-2">
+          <span className="text-sm font-medium text-slate-700">Club organisateur</span>
+          <input name="clubOrganisateur" defaultValue={challenge.clubOrganisateur} required disabled={challenge.isArchived || Boolean(challenge.closedAt)} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+        </label>
+        <label className="space-y-1 md:col-span-2">
+          <span className="text-sm font-medium text-slate-700">Logo du club organisateur (optionnel)</span>
+          <input type="file" name="clubOrganisateurLogo" accept="image/*" disabled={challenge.isArchived || Boolean(challenge.closedAt)} className="w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+        </label>
+        {challenge.clubOrganisateurLogo ? (
+          <div className="md:col-span-2 space-y-2 rounded border border-slate-200 bg-slate-50 p-3">
+            <p className="text-sm text-slate-700">Logo actuel</p>
+            <Image src={challenge.clubOrganisateurLogo} alt="Logo club organisateur" width={64} height={64} className="h-16 w-16 rounded object-contain" unoptimized />
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" name="removeClubLogo" disabled={challenge.isArchived || Boolean(challenge.closedAt)} />
+              Supprimer le logo actuel
+            </label>
+          </div>
+        ) : null}
+
         <label className="flex items-center gap-2 md:col-span-2">
           <input type="checkbox" name="isActive" defaultChecked={challenge.isActive} disabled={challenge.isArchived || Boolean(challenge.closedAt)} />
           <span className="text-sm text-slate-700">Définir comme événement actif</span>
@@ -271,6 +314,12 @@ export default async function EventDetailPage({
         {roundsError ? (
           <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700 md:col-span-2">
             Le nombre de tournées doit être supérieur ou égal à 1.
+          </div>
+        ) : null}
+
+        {organizerError ? (
+          <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700 md:col-span-2">
+            Le club organisateur est obligatoire.
           </div>
         ) : null}
 

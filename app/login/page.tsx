@@ -28,6 +28,14 @@ export default async function LoginPage({ searchParams }: { searchParams?: { err
     redirect("/");
   }
 
+import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
+
+async function mockLogin() {
+  "use server";
+  redirect("/login/success");
+}
+
+export default function LoginPage() {
   return (
     <div className="mx-auto mt-10 max-w-md space-y-6 rounded border bg-white p-6">
       <div>
@@ -52,6 +60,10 @@ export default async function LoginPage({ searchParams }: { searchParams?: { err
         </label>
 
         <button type="submit" className="w-full rounded bg-blue-600 px-4 py-2 text-white">
+        <p className="text-slate-600">Écran de connexion simplifié pour la V1.</p>
+      </div>
+      <form action={mockLogin}>
+        <button type="submit" className="rounded bg-blue-600 px-4 py-2 text-white">
           Se connecter
         </button>
       </form>
