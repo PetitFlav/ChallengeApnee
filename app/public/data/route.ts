@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { requireSessionUser } from "@/lib/auth";
-import { requireActiveChallengeForUser, requireRestrictedModulesAccess } from "@/lib/access";
+import { requireActiveChallengeForUser, requirePublicScreenAccess } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const user = await requireSessionUser();
-  await requireRestrictedModulesAccess(user);
+  await requirePublicScreenAccess(user);
   const challenge = await requireActiveChallengeForUser(user);
 
   const total = await prisma.sheetEntry.aggregate({

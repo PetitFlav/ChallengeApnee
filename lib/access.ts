@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getChallengeTimeRange } from "@/lib/rounds";
 
 type SessionUser = {
   id: string;
@@ -18,6 +19,85 @@ export function canAccessRestrictedModules(user: SessionUser) {
 
 export async function requireRestrictedModulesAccess(user: SessionUser) {
   if (!canAccessRestrictedModules(user)) {
+    redirect("/?message=forbidden-module");
+  }
+}
+
+type LiveInputAccessEvaluation = {
+  userId: string;
+  isSuperUser: boolean;
+  eventId: string | null;
+  isAffiliated: boolean;
+  isEventActive: boolean;
+  isEventClosed: boolean;
+  isWithinInputWindow: boolean;
+  canAccessLengthsEntry: boolean;
+  canAccessPublicScreen: boolean;
+};
+
+function isNowWithinInputWindow(challenge: {
+  eventDate: Date;
+  startTime: string | null;
+  timezone: string | null;
+  durationMinutes: number;
+}) {
+  const now = new Date();
+  const { startAt, endAt } = getChallengeTimeRange(challenge);
+  return now >= startAt && now <= endAt;
+}
+
+export async function evaluateLiveInputAccess(user: SessionUser): Promise<LiveInputAccessEvaluation> {
+  const activeChallenge = await prisma.challenge.findFirst({
+    where: { isActive: true },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      eventDate: true,
+      startTime: true,
+      timezone: true,
+      durationMinutes: true,
+      closedAt: true,
+      userLinks: {
+        where: { userId: user.id },
+        select: { id: true },
+      },
+    },
+  });
+
+  const isEventActive = Boolean(activeChallenge);
+  const isAffiliated = user.isSuperUser ? true : Boolean(activeChallenge?.userLinks.length);
+  const isEventClosed = Boolean(activeChallenge?.closedAt);
+  const isWithinInputWindow = activeChallenge ? isNowWithinInputWindow(activeChallenge) : false;
+
+  const canAccessLiveInput =
+    user.isSuperUser || (isAffiliated && isEventActive && !isEventClosed && isWithinInputWindow);
+
+  const evaluation = {
+    userId: user.id,
+    isSuperUser: user.isSuperUser,
+    eventId: activeChallenge?.id ?? null,
+    isAffiliated,
+    isEventActive,
+    isEventClosed,
+    isWithinInputWindow,
+    canAccessLengthsEntry: canAccessLiveInput,
+    canAccessPublicScreen: canAccessLiveInput,
+  };
+
+  console.info("[AccessControl][LiveInput]", evaluation);
+  return evaluation;
+}
+
+export async function requireLengthsEntryAccess(user: SessionUser) {
+  const access = await evaluateLiveInputAccess(user);
+  if (!access.canAccessLengthsEntry) {
+    redirect("/?message=forbidden-module");
+  }
+}
+
+export async function requirePublicScreenAccess(user: SessionUser) {
+  const access = await evaluateLiveInputAccess(user);
+  if (!access.canAccessPublicScreen) {
     redirect("/?message=forbidden-module");
   }
 }

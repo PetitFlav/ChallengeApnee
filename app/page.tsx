@@ -8,6 +8,7 @@ import {
   UNAUTHORIZED_MODULE_ACCESS_MESSAGE,
   POST_CLOSURE_MODULE_ACCESS_MESSAGE,
   isPostClosureRestrictedUser,
+  evaluateLiveInputAccess,
 } from "@/lib/access";
 import { LogoutButton } from "@/app/logout-button";
 
@@ -15,9 +16,9 @@ const links = [
   { href: "/events", label: "Événements", access: "superuser" },
   { href: "/swimmers", label: "Nageurs", access: "superuser" },
   { href: "/sheets", label: "Vérification", access: "event-user" },
-  { href: "/sheets/new", label: "Saisie des longueurs", access: "superuser" },
+  { href: "/sheets/new", label: "Saisie des longueurs", access: "live-input" },
   { href: "/dashboard", label: "Dashboard", access: "event-user" },
-  { href: "/public", label: "Écran public", access: "superuser" },
+  { href: "/public", label: "Écran public", access: "live-input" },
 ] as const;
 
 export default async function HomePage({ searchParams }: { searchParams?: { message?: string } }) {
@@ -30,6 +31,7 @@ export default async function HomePage({ searchParams }: { searchParams?: { mess
   const hasChallengeAccess = Boolean(challenge);
   const hasSuperUserAccess = canAccessRestrictedModules(user);
   const isPostClosureRestricted = await isPostClosureRestrictedUser(user);
+  const liveInputAccess = await evaluateLiveInputAccess(user);
 
   return (
     <div className="space-y-4">
@@ -66,6 +68,9 @@ export default async function HomePage({ searchParams }: { searchParams?: { mess
           const isDisabled =
             !hasChallengeAccess ||
             (link.access === "superuser" && !hasSuperUserAccess) ||
+            (link.access === "live-input" &&
+              ((link.href === "/sheets/new" && !liveInputAccess.canAccessLengthsEntry) ||
+                (link.href === "/public" && !liveInputAccess.canAccessPublicScreen))) ||
             (isPostClosureRestricted && (link.href === "/events" || link.href === "/swimmers"));
 
           if (isDisabled) {
