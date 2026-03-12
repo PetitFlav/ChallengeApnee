@@ -1,5 +1,5 @@
 import { requireSessionUser } from "@/lib/auth";
-import { requireActiveChallengeForUser, requireRestrictedModulesAccess } from "@/lib/access";
+import { requireChallengeForModule, requirePublicScreenAccess } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { PublicLiveScreen } from "./public-live-screen";
 
@@ -27,9 +27,9 @@ function computeEndTime(startTime: string | null, durationMinutes: number, fallb
 
 export default async function PublicScreenPage() {
   const user = await requireSessionUser();
-  await requireRestrictedModulesAccess(user);
+  await requirePublicScreenAccess(user);
 
-  const challenge = await requireActiveChallengeForUser(user);
+  const challenge = await requireChallengeForModule(user);
 
   const total = await prisma.sheetEntry.aggregate({
     where: { sheet: { challengeId: challenge.id } },

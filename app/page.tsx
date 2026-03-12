@@ -2,22 +2,21 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import {
-  canAccessRestrictedModules,
   ensurePreferredChallengeForUser,
   NO_CHALLENGE_ACCESS_MESSAGE,
   UNAUTHORIZED_MODULE_ACCESS_MESSAGE,
   POST_CLOSURE_MODULE_ACCESS_MESSAGE,
-  isPostClosureRestrictedUser,
+  canAccessModule,
 } from "@/lib/access";
 import { LogoutButton } from "@/app/logout-button";
 
 const links = [
-  { href: "/events", label: "Événements", access: "superuser" },
-  { href: "/swimmers", label: "Nageurs", access: "superuser" },
-  { href: "/sheets", label: "Vérification", access: "event-user" },
-  { href: "/sheets/new", label: "Saisie des longueurs", access: "superuser" },
-  { href: "/dashboard", label: "Dashboard", access: "event-user" },
-  { href: "/public", label: "Écran public", access: "superuser" },
+  { href: "/events", label: "Événements" },
+  { href: "/swimmers", label: "Nageurs" },
+  { href: "/sheets", label: "Vérification" },
+  { href: "/sheets/new", label: "Saisie des longueurs" },
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/public", label: "Écran public" },
 ] as const;
 
 export default async function HomePage({ searchParams }: { searchParams?: { message?: string } }) {
@@ -28,8 +27,15 @@ export default async function HomePage({ searchParams }: { searchParams?: { mess
 
   const challenge = await ensurePreferredChallengeForUser(user);
   const hasChallengeAccess = Boolean(challenge);
-  const hasSuperUserAccess = canAccessRestrictedModules(user);
-  const isPostClosureRestricted = await isPostClosureRestrictedUser(user);
+  const [canAccessEvents, canAccessSwimmers, canAccessVerification, canAccessLengthsEntry, canAccessDashboard, canAccessPublicScreen, canAccessUserAdmin] = await Promise.all([
+    canAccessModule(user, "events"),
+    canAccessModule(user, "swimmers"),
+    canAccessModule(user, "verification"),
+    canAccessModule(user, "lengths-entry"),
+    canAccessModule(user, "dashboard"),
+    canAccessModule(user, "public-screen"),
+    canAccessModule(user, "user-admin"),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -65,8 +71,12 @@ export default async function HomePage({ searchParams }: { searchParams?: { mess
         {links.map((link) => {
           const isDisabled =
             !hasChallengeAccess ||
-            (link.access === "superuser" && !hasSuperUserAccess) ||
-            (isPostClosureRestricted && (link.href === "/events" || link.href === "/swimmers"));
+            (link.href === "/events" && !canAccessEvents) ||
+            (link.href === "/swimmers" && !canAccessSwimmers) ||
+            (link.href === "/sheets" && !canAccessVerification) ||
+            (link.href === "/sheets/new" && !canAccessLengthsEntry) ||
+            (link.href === "/dashboard" && !canAccessDashboard) ||
+            (link.href === "/public" && !canAccessPublicScreen);
 
           if (isDisabled) {
             return (
@@ -86,7 +96,7 @@ export default async function HomePage({ searchParams }: { searchParams?: { mess
             </Link>
           );
         })}
-        {user.isSuperUser ? (
+        {canAccessUserAdmin ? (
           <Link href="/admin/users" className="rounded border bg-white p-3 hover:bg-slate-100">
             Gestion des utilisateurs
           </Link>

@@ -5,7 +5,7 @@ import {
   CLOSED_READ_ONLY_MESSAGE,
 } from "@/lib/events";
 import { requireSessionUser } from "@/lib/auth";
-import { requireActiveChallengeForUser, requireRestrictedModulesAccess } from "@/lib/access";
+import { requireChallengeForModule, requireLengthsEntryAccess } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { buildRoundAvailability } from "@/lib/rounds";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
@@ -95,7 +95,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
   "use server";
 
   const user = await requireSessionUser();
-  await requireRestrictedModulesAccess(user);
+  await requireLengthsEntryAccess(user);
 
   if (!hasDatabaseUrl) {
     return {
@@ -105,7 +105,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
       nextRoundId: null,
     };
   }
-  const challenge = await requireActiveChallengeForUser(user);
+  const challenge = await requireChallengeForModule(user);
   const roundId = String(formData.get("roundId") || "").trim();
   const laneId = String(formData.get("laneId") || "").trim();
   const entriesJson = String(formData.get("entriesJson") || "[]");
@@ -342,7 +342,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
 
 export default async function NewSheetPage() {
   const user = await requireSessionUser();
-  await requireRestrictedModulesAccess(user);
+  await requireLengthsEntryAccess(user);
 
   if (!hasDatabaseUrl) {
     return (
@@ -357,7 +357,7 @@ export default async function NewSheetPage() {
   }
 
   try {
-    const challenge = await requireActiveChallengeForUser(user);
+    const challenge = await requireChallengeForModule(user);
     const isArchived = challenge.isArchived;
     const isClosed = Boolean(challenge.closedAt);
 

@@ -15,7 +15,8 @@ export type DashboardVerificationStatus =
   | "Non vérifiée"
   | "Partiellement vérifiée"
   | "Vérifiée sans écart"
-  | "Vérifiée avec écarts";
+  | "Vérifiée avec écarts"
+  | "Vérifiée avec écarts (Validé)";
 
 export type DashboardSwimmerStatus = "OK" | "Différence" | "Absent en vérification" | "Ajouté en vérification";
 
@@ -73,8 +74,9 @@ export function getDashboardVerificationStatus(params: {
   sheetsCount: number;
   verifiedSheetsCount: number;
   differencesCount: number;
+  unresolvedDifferencesCount?: number;
 }): DashboardVerificationStatus {
-  const { sheetsCount, verifiedSheetsCount, differencesCount } = params;
+  const { sheetsCount, verifiedSheetsCount, differencesCount, unresolvedDifferencesCount = differencesCount } = params;
 
   if (sheetsCount === 0 || verifiedSheetsCount === 0) {
     return "Non vérifiée";
@@ -85,6 +87,10 @@ export function getDashboardVerificationStatus(params: {
   }
 
   if (differencesCount > 0) {
+    if (unresolvedDifferencesCount === 0) {
+      return "Vérifiée avec écarts (Validé)";
+    }
+
     return "Vérifiée avec écarts";
   }
 
