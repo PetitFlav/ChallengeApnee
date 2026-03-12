@@ -20,6 +20,57 @@ const links = [
   { href: "/public", label: "Écran public", access: "superuser" },
 ] as const;
 
+const rightsSummary = [
+  {
+    eventStatus: "Événement non actif",
+    rows: [
+      { menu: "Événement", superUser: true, affiliatedUser: true, nonAffiliatedUser: false },
+      { menu: "Nageurs", superUser: true, affiliatedUser: true, nonAffiliatedUser: false },
+      { menu: "Vérification", superUser: true, affiliatedUser: false, nonAffiliatedUser: false },
+      { menu: "Saisie des longueurs", superUser: true, affiliatedUser: false, nonAffiliatedUser: false },
+      { menu: "Dashboard", superUser: true, affiliatedUser: false, nonAffiliatedUser: false },
+      { menu: "Écran public", superUser: true, affiliatedUser: false, nonAffiliatedUser: false },
+      { menu: "Gestion des utilisateurs", superUser: true, affiliatedUser: false, nonAffiliatedUser: false },
+    ],
+  },
+  {
+    eventStatus: "Événement actif",
+    rows: [
+      { menu: "Événement", superUser: true, affiliatedUser: true, nonAffiliatedUser: false },
+      { menu: "Nageurs", superUser: true, affiliatedUser: true, nonAffiliatedUser: false },
+      { menu: "Vérification", superUser: true, affiliatedUser: true, nonAffiliatedUser: false },
+      { menu: "Saisie des longueurs", superUser: true, affiliatedUser: true, nonAffiliatedUser: false },
+      { menu: "Dashboard", superUser: true, affiliatedUser: true, nonAffiliatedUser: false },
+      { menu: "Écran public", superUser: true, affiliatedUser: true, nonAffiliatedUser: false },
+      { menu: "Gestion des utilisateurs", superUser: true, affiliatedUser: false, nonAffiliatedUser: false },
+    ],
+  },
+  {
+    eventStatus: "Événement clôturé",
+    rows: [
+      { menu: "Événement", superUser: true, affiliatedUser: false, nonAffiliatedUser: false },
+      { menu: "Nageurs", superUser: true, affiliatedUser: false, nonAffiliatedUser: false },
+      { menu: "Vérification", superUser: true, affiliatedUser: true, nonAffiliatedUser: false },
+      { menu: "Saisie des longueurs", superUser: true, affiliatedUser: true, nonAffiliatedUser: false },
+      { menu: "Dashboard", superUser: true, affiliatedUser: true, nonAffiliatedUser: false },
+      { menu: "Écran public", superUser: true, affiliatedUser: true, nonAffiliatedUser: false },
+      { menu: "Gestion des utilisateurs", superUser: true, affiliatedUser: false, nonAffiliatedUser: false },
+    ],
+  },
+] as const;
+
+function AccessCell({ allowed }: { allowed: boolean }) {
+  return (
+    <span
+      className={`inline-flex rounded px-2 py-1 text-xs font-semibold ${
+        allowed ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+      }`}
+    >
+      {allowed ? "Accès" : "Pas accès"}
+    </span>
+  );
+}
+
 export default async function HomePage({ searchParams }: { searchParams?: { message?: string } }) {
   const user = await getSessionUser();
   if (!user) {
@@ -92,6 +143,46 @@ export default async function HomePage({ searchParams }: { searchParams?: { mess
           </Link>
         ) : null}
       </nav>
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">Récapitulatif des droits</h2>
+        <div className="overflow-x-auto rounded border bg-white">
+          <table className="min-w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-slate-100 text-left">
+                <th className="border-b p-2">Statut</th>
+                <th className="border-b p-2">Menu</th>
+                <th className="border-b p-2">Superuser</th>
+                <th className="border-b p-2">Utilisateur affilié</th>
+                <th className="border-b p-2">Utilisateur non affilié</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rightsSummary.map((status) =>
+                status.rows.map((row, index) => (
+                  <tr key={`${status.eventStatus}-${row.menu}`} className="align-top odd:bg-white even:bg-slate-50">
+                    {index === 0 ? (
+                      <td className="border-b p-2 font-medium" rowSpan={status.rows.length}>
+                        {status.eventStatus}
+                      </td>
+                    ) : null}
+                    <td className="border-b p-2">{row.menu}</td>
+                    <td className="border-b p-2">
+                      <AccessCell allowed={row.superUser} />
+                    </td>
+                    <td className="border-b p-2">
+                      <AccessCell allowed={row.affiliatedUser} />
+                    </td>
+                    <td className="border-b p-2">
+                      <AccessCell allowed={row.nonAffiliatedUser} />
+                    </td>
+                  </tr>
+                )),
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }
