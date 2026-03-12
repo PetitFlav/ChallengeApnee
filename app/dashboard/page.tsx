@@ -458,6 +458,8 @@ export default async function DashboardPage() {
           .filter((swimmer): swimmer is NonNullable<typeof swimmer> => swimmer !== null)
           .sort((a, b) => a.swimmerNumber - b.swimmerNumber);
 
+        const unresolvedDifferencesCount = swimmers.filter((swimmer) => swimmer.hasDifferences && !swimmer.finalSelection).length;
+
         return {
           laneId: sheet.lane.id,
           laneCode: sheet.lane.code,
@@ -465,10 +467,12 @@ export default async function DashboardPage() {
           swimmersCount: sheet.entries.length,
           verificationsCount: sheet.verifications.length,
           differencesCount,
+          unresolvedDifferencesCount,
           status: getDashboardVerificationStatus({
             sheetsCount: 1,
             verifiedSheetsCount: latestVerification ? 1 : 0,
             differencesCount,
+            unresolvedDifferencesCount,
           }),
           swimmers,
         };
@@ -477,6 +481,7 @@ export default async function DashboardPage() {
       const verificationsCount = round.sheets.reduce((sum, sheet) => sum + sheet.verifications.length, 0);
       const verifiersCount = new Set(round.sheets.flatMap((sheet) => sheet.verifications.map((verification) => verification.userId))).size;
       const differencesCount = lanes.reduce((sum, lane) => sum + lane.differencesCount, 0);
+      const unresolvedDifferencesCount = lanes.reduce((sum, lane) => sum + lane.unresolvedDifferencesCount, 0);
       const verifiedSheetsCount = round.sheets.filter((sheet) => sheet.verifications.length > 0).length;
 
       return {
@@ -486,10 +491,12 @@ export default async function DashboardPage() {
         verificationsCount,
         verifiersCount,
         differencesCount,
+        unresolvedDifferencesCount,
         status: getDashboardVerificationStatus({
           sheetsCount: round.sheets.length,
           verifiedSheetsCount,
           differencesCount,
+          unresolvedDifferencesCount,
         }),
         lanes,
       };

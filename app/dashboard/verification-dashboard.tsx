@@ -58,6 +58,7 @@ type LaneRow = {
   swimmersCount: number;
   verificationsCount: number;
   differencesCount: number;
+  unresolvedDifferencesCount: number;
   status: DashboardVerificationStatus;
   swimmers: SwimmerRow[];
 };
@@ -69,9 +70,18 @@ type RoundRow = {
   verificationsCount: number;
   verifiersCount: number;
   differencesCount: number;
+  unresolvedDifferencesCount: number;
   status: DashboardVerificationStatus;
   lanes: LaneRow[];
 };
+
+function getVerificationStatusClassName(status: DashboardVerificationStatus) {
+  if (status === "Vérifiée avec écarts (Validé)") {
+    return "text-emerald-700 font-medium";
+  }
+
+  return "text-slate-900";
+}
 
 type DashboardSummary = {
   totalLines: number;
@@ -265,7 +275,7 @@ export function VerificationDashboard({
                 <td className="p-2">{round.verificationsCount}</td>
                 <td className="p-2">{round.verifiersCount}</td>
                 <td className="p-2">{round.differencesCount}</td>
-                <td className="p-2">{round.status}</td>
+                <td className={`p-2 ${getVerificationStatusClassName(round.status)}`}>{round.status}</td>
               </tr>
             ))}
           </tbody>
@@ -310,7 +320,7 @@ export function VerificationDashboard({
                     <td className="p-2">{lane.swimmersCount}</td>
                     <td className="p-2">{lane.verificationsCount}</td>
                     <td className="p-2">{lane.differencesCount}</td>
-                    <td className="p-2">{lane.status}</td>
+                    <td className={`p-2 ${getVerificationStatusClassName(lane.status)}`}>{lane.status}</td>
                   </tr>
                 ))}
               </tbody>
