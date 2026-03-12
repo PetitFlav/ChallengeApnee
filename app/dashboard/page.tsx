@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { requireSessionUser } from "@/lib/auth";
-import { requireActiveChallengeForUser } from "@/lib/access";
+import { requireChallengeForModule, requireModuleAccess } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import {
@@ -39,13 +39,15 @@ export default async function DashboardPage() {
   }
 
   try {
-    const challenge = await requireActiveChallengeForUser(user);
+    await requireModuleAccess(user, "dashboard");
+    const challenge = await requireChallengeForModule(user);
 
     async function saveFinalResult(formData: FormData) {
       "use server";
 
       const user = await requireSessionUser();
-      const challenge = await requireActiveChallengeForUser(user);
+      await requireModuleAccess(user, "dashboard");
+      const challenge = await requireChallengeForModule(user);
 
       const sheetId = String(formData.get("sheetId") ?? "");
       const roundId = String(formData.get("roundId") ?? "");
@@ -121,7 +123,8 @@ export default async function DashboardPage() {
       "use server";
 
       const user = await requireSessionUser();
-      const challenge = await requireActiveChallengeForUser(user);
+      await requireModuleAccess(user, "dashboard");
+      const challenge = await requireChallengeForModule(user);
 
       const sheets = await prisma.sheet.findMany({
         where: { challengeId: challenge.id },

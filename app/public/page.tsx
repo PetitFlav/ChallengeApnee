@@ -1,5 +1,5 @@
 import { requireSessionUser } from "@/lib/auth";
-import { requireActiveChallengeForUser, requirePublicScreenAccess } from "@/lib/access";
+import { requireChallengeForModule, requirePublicScreenAccess } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { PublicLiveScreen } from "./public-live-screen";
 
@@ -29,7 +29,7 @@ export default async function PublicScreenPage() {
   const user = await requireSessionUser();
   await requirePublicScreenAccess(user);
 
-  const challenge = await requireActiveChallengeForUser(user);
+  const challenge = await requireChallengeForModule(user);
 
   const total = await prisma.sheetEntry.aggregate({
     where: { sheet: { challengeId: challenge.id } },
