@@ -146,9 +146,9 @@ export default async function SwimmersPrintPage({
                     <tbody>
                       {columnRows.map((row) => (
                         <tr key={`row-${pageIndex + 1}-${columnIndex + 1}-${row.number}`}>
-                          <td className="border border-slate-900 px-2 py-3 align-middle text-2xl font-extrabold leading-none">{row.number}</td>
-                          <td className="border border-slate-900 px-2 py-3 align-middle text-lg font-medium">{row.fullName}</td>
-                          <td className="border border-slate-900 px-2 py-3 align-middle text-base">{row.club}</td>
+                          <td className="border border-slate-900 px-2 py-[10px] align-middle text-2xl font-extrabold leading-none">{row.number}</td>
+                          <td className="border border-slate-900 px-2 py-[10px] align-middle text-lg font-medium">{row.fullName}</td>
+                          <td className="border border-slate-900 px-2 py-[10px] align-middle text-base">{row.club}</td>
                         </tr>
                       ))}
                     </tbody>
