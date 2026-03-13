@@ -109,7 +109,7 @@ export default async function SwimmersPrintPage({
               key={`page-${pageIndex + 1}`}
               className="print-page flex min-h-[760px] flex-col rounded border border-slate-300 bg-white p-6 print:min-h-0 print:rounded-none print:border-none print:p-0"
             >
-              <header className="mb-4 flex items-center justify-between border-b border-slate-400 pb-3">
+              <header className="mb-3 flex items-center justify-between border-b border-slate-400 pb-2">
                 <div className="flex items-center gap-4">
                   {challenge.clubOrganisateurLogo ? (
                     <Image
@@ -126,7 +126,7 @@ export default async function SwimmersPrintPage({
                     </div>
                   )}
                   <div>
-                    <p className="text-3xl font-extrabold uppercase tracking-wide">{challenge.name}</p>
+                    <p className="text-2xl font-extrabold uppercase tracking-wide">{challenge.name}</p>
                     <p className="text-base font-medium">Liste des nageurs</p>
                   </div>
                 </div>
@@ -138,17 +138,17 @@ export default async function SwimmersPrintPage({
                   <table key={`column-${columnIndex + 1}`} className="w-full border-collapse text-left">
                     <thead>
                       <tr>
-                        <th className="w-16 border border-slate-900 px-2 py-2 text-base font-semibold">N°</th>
-                        <th className="border border-slate-900 px-2 py-2 text-base font-semibold">Prénom Nom</th>
-                        <th className="w-40 border border-slate-900 px-2 py-2 text-base font-semibold">Club</th>
+                        <th className="w-16 border border-slate-900 px-2 py-1.5 text-base font-semibold">N°</th>
+                        <th className="border border-slate-900 px-2 py-1.5 text-base font-semibold">Prénom Nom</th>
+                        <th className="w-40 border border-slate-900 px-2 py-1.5 text-base font-semibold">Club</th>
                       </tr>
                     </thead>
                     <tbody>
                       {columnRows.map((row) => (
                         <tr key={`row-${pageIndex + 1}-${columnIndex + 1}-${row.number}`}>
-                          <td className="border border-slate-900 px-2 py-4 align-middle text-2xl font-extrabold leading-none">{row.number}</td>
-                          <td className="border border-slate-900 px-2 py-4 align-middle text-lg font-medium">{row.fullName}</td>
-                          <td className="border border-slate-900 px-2 py-4 align-middle text-base">{row.club}</td>
+                          <td className="border border-slate-900 px-2 py-3 align-middle text-2xl font-extrabold leading-none">{row.number}</td>
+                          <td className="border border-slate-900 px-2 py-3 align-middle text-lg font-medium">{row.fullName}</td>
+                          <td className="border border-slate-900 px-2 py-3 align-middle text-base">{row.club}</td>
                         </tr>
                       ))}
                     </tbody>
