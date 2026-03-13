@@ -28,7 +28,7 @@ function CountingSheetTemplate() {
         </div>
       </header>
 
-      <table className="mt-3 w-full flex-1 border-collapse text-[10px]">
+      <table className="counting-sheet-table mt-3 flex-1 text-[10px]">
         <thead>
           <tr>
             <th className="w-[62px] border border-slate-900 px-1.5 py-1 text-left font-semibold leading-tight">Numéro nageur</th>
@@ -87,12 +87,54 @@ export default async function CountingSheetsPrintPage({ params }: { params: { id
         }
 
         @media print {
+          *,
+          *::before,
+          *::after {
+            box-sizing: border-box;
+          }
+
+          .print-root {
+            width: 194mm;
+          }
+
           .print-page {
+            width: 194mm;
+            height: 281mm;
             break-after: page;
+            break-inside: avoid;
           }
 
           .print-page:last-child {
             break-after: auto;
+          }
+
+          .counting-sheets-grid {
+            display: grid;
+            grid-template-columns: 95mm 95mm;
+            column-gap: 2mm;
+            width: 192mm;
+            height: 279mm;
+          }
+
+          .counting-sheet-column {
+            width: 95mm;
+            height: 279mm;
+          }
+
+          .counting-sheet-column--right {
+            border-left: 1px solid rgb(15 23 42);
+            padding-left: 1mm;
+          }
+
+          .counting-sheet {
+            break-inside: avoid;
+          }
+
+          .counting-sheet-table {
+            width: 100%;
+            border-collapse: collapse;
+            border-spacing: 0;
+            table-layout: fixed;
           }
         }
       `}</style>
@@ -106,12 +148,12 @@ export default async function CountingSheetsPrintPage({ params }: { params: { id
         <PrintButton />
       </div>
 
-      <section className="print-page mx-auto aspect-[210/297] w-full max-w-[900px] rounded border border-slate-300 bg-white p-3 print:max-w-none print:rounded-none print:border-none print:p-0">
-        <div className="grid h-full grid-cols-2 gap-2 divide-x divide-slate-900">
-          <div className="pr-1">
+      <section className="print-page mx-auto aspect-[210/297] w-full max-w-[900px] rounded border border-slate-300 bg-white p-3 print-root print:max-w-none print:rounded-none print:border-none print:p-0">
+        <div className="counting-sheets-grid grid h-full grid-cols-2 gap-2">
+          <div className="counting-sheet-column pr-1">
             <CountingSheetTemplate />
           </div>
-          <div className="pl-1">
+          <div className="counting-sheet-column counting-sheet-column--right pl-1">
             <CountingSheetTemplate />
           </div>
         </div>
