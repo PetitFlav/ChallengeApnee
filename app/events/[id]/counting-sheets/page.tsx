@@ -9,8 +9,26 @@ export const dynamic = "force-dynamic";
 
 const ROWS_PER_SHEET = 16;
 const COUNT_BOXES_PER_ROW = 10;
+const EXTRA_BLANK_SHEETS_COUNT = 8;
 
-function CountingSheetTemplate() {
+type CountingSheetData = {
+  id: string;
+  roundLabel: string;
+  laneCode: string;
+  laneType: string;
+};
+
+function chunkSheets(sheets: CountingSheetData[], chunkSize: number) {
+  const chunks: CountingSheetData[][] = [];
+
+  for (let index = 0; index < sheets.length; index += chunkSize) {
+    chunks.push(sheets.slice(index, index + chunkSize));
+  }
+
+  return chunks;
+}
+
+function CountingSheetTemplate({ sheet }: { sheet: CountingSheetData }) {
   return (
     <article className="counting-sheet flex h-full flex-col border border-slate-900 bg-white p-3">
       <header className="space-y-3 text-[10px] leading-tight">
@@ -18,22 +36,21 @@ function CountingSheetTemplate() {
           Nom - Prénom compteur : <span className="inline-block min-w-[130px] border-b border-dotted border-slate-700">&nbsp;</span>
         </p>
 
-        <div className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-x-2 gap-y-1">
+        <div className="grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-1">
           <p className="font-semibold">
-            Longueur distance ligne : <span className="inline-block min-w-[26px] border-b border-dotted border-slate-700">&nbsp;</span>
+            Type ligne : <span className="font-bold">{sheet.laneType}</span>
           </p>
-          <p>mètres</p>
-          <p className="justify-self-end font-semibold">Identifiant ligne :</p>
-          <p className="inline-block min-w-[24px] border-b border-dotted border-slate-700">&nbsp;</p>
+          <p className="justify-self-end font-semibold">Tournée : {sheet.roundLabel}</p>
+          <p className="col-span-2 font-semibold">Identifiant ligne : {sheet.laneCode}</p>
         </div>
       </header>
 
       <table className="counting-sheet-table mt-3 flex-1 text-[10px]">
         <thead>
           <tr>
-            <th className="w-[62px] border border-slate-900 px-1.5 py-1 text-left font-semibold leading-tight">Numéro nageur</th>
+            <th className="w-[50px] border border-slate-900 px-1 py-1 text-left font-semibold leading-tight">Numéro nageur</th>
             <th className="border border-slate-900 px-1 py-1 text-center text-[20px] font-semibold">Tournée ...</th>
-            <th className="w-[54px] border border-slate-900 px-1 py-1 text-center font-semibold">Multi ligne</th>
+            <th className="w-[42px] border border-slate-900 px-1 py-1 text-center font-semibold">Multi ligne</th>
           </tr>
         </thead>
         <tbody>
@@ -41,18 +58,18 @@ function CountingSheetTemplate() {
             <tr key={`row-${rowIndex + 1}`}>
               <td className="border border-slate-900 px-1">&nbsp;</td>
               <td className="border border-slate-900 px-1 py-[2px]">
-                <div className="flex justify-center gap-[5px]">
+                <div className="flex justify-center gap-[6px]">
                   {Array.from({ length: COUNT_BOXES_PER_ROW }, (_, boxIndex) => (
                     <span
                       key={`box-${rowIndex + 1}-${boxIndex + 1}`}
-                      className="inline-block h-[18px] w-[18px] border border-slate-700"
+                      className="inline-block h-[20px] w-[20px] border border-dotted border-slate-700"
                     />
                   ))}
                 </div>
               </td>
               <td className="border border-slate-900 px-1 py-[2px]">
                 <div className="flex justify-center">
-                  <span className="inline-block h-[16px] w-[16px] border border-slate-900" />
+                  <span className="inline-block h-[14px] w-[14px] border border-slate-900" />
                 </div>
               </td>
             </tr>
@@ -70,10 +87,51 @@ export default async function CountingSheetsPrintPage({ params }: { params: { id
 
   const challenge = await prisma.challenge.findUnique({
     where: { id: params.id },
-    select: { id: true, name: true },
+    select: {
+      id: true,
+      name: true,
+      rounds: {
+        select: {
+          id: true,
+          label: true,
+          displayOrder: true,
+        },
+        orderBy: { displayOrder: "asc" },
+      },
+      lanes: {
+        select: {
+          id: true,
+          code: true,
+          distanceM: true,
+          displayOrder: true,
+          isActive: true,
+        },
+        where: { isActive: true },
+        orderBy: { displayOrder: "asc" },
+      },
+    },
   });
 
   if (!challenge) notFound();
+
+  const generatedSheets: CountingSheetData[] = challenge.rounds.flatMap((round) =>
+    challenge.lanes.map((lane) => ({
+      id: `${round.id}-${lane.id}`,
+      roundLabel: round.label,
+      laneCode: lane.code,
+      laneType: `${lane.distanceM}m`,
+    })),
+  );
+
+  const blankSheets: CountingSheetData[] = Array.from({ length: EXTRA_BLANK_SHEETS_COUNT }, (_, index) => ({
+    id: `blank-${index + 1}`,
+    roundLabel: "______",
+    laneCode: "______",
+    laneType: "______",
+  }));
+
+  const sheets = [...generatedSheets, ...blankSheets];
+  const pages = chunkSheets(sheets, 2);
 
   return (
     <div className="bg-slate-100 p-4 text-slate-950 print:bg-white print:p-0">
@@ -103,8 +161,12 @@ export default async function CountingSheetsPrintPage({ params }: { params: { id
           .print-page {
             width: 194mm;
             height: 281mm;
-            break-after: auto;
+            break-after: page;
             break-inside: avoid;
+          }
+
+          .print-page:last-child {
+            break-after: auto;
           }
 
           .counting-sheets-grid {
@@ -118,6 +180,7 @@ export default async function CountingSheetsPrintPage({ params }: { params: { id
           .counting-sheet-column {
             width: 95mm;
             height: 279mm;
+            padding: 0;
           }
 
           .counting-sheet-column--right {
@@ -142,21 +205,28 @@ export default async function CountingSheetsPrintPage({ params }: { params: { id
         <div className="space-y-1">
           <BackToMainMenuLink />
           <h1 className="text-lg font-semibold">Fiches de comptage vierges — {challenge.name}</h1>
-          <p className="text-sm text-slate-600">Format A4 portrait, 2 fiches par page.</p>
+          <p className="text-sm text-slate-600">Format A4 portrait, 2 fiches par page — {sheets.length} fiches ({pages.length} pages).</p>
         </div>
         <PrintButton />
       </div>
 
-      <section className="print-page mx-auto aspect-[210/297] w-full max-w-[900px] rounded border border-slate-300 bg-white p-3 print-root print:max-w-none print:rounded-none print:border-none print:p-0">
-        <div className="counting-sheets-grid grid h-full grid-cols-2 gap-2">
-          <div className="counting-sheet-column pr-1">
-            <CountingSheetTemplate />
-          </div>
-          <div className="counting-sheet-column counting-sheet-column--right pl-1">
-            <CountingSheetTemplate />
-          </div>
-        </div>
-      </section>
+      <div className="mx-auto max-w-[900px] space-y-4 print-root print:max-w-none print:space-y-0">
+        {pages.map((pageSheets, pageIndex) => (
+          <section
+            key={`page-${pageIndex + 1}`}
+            className="print-page mx-auto aspect-[210/297] w-full rounded border border-slate-300 bg-white p-3 print:mx-0 print:aspect-auto print:rounded-none print:border-none print:p-0"
+          >
+            <div className="counting-sheets-grid grid h-full grid-cols-2 gap-2">
+              <div className="counting-sheet-column pr-1">
+                {pageSheets[0] ? <CountingSheetTemplate sheet={pageSheets[0]} /> : null}
+              </div>
+              <div className="counting-sheet-column counting-sheet-column--right pl-1">
+                {pageSheets[1] ? <CountingSheetTemplate sheet={pageSheets[1]} /> : null}
+              </div>
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
