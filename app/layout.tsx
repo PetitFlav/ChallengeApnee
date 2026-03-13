@@ -47,7 +47,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
           <main className="flex-1">{children}</main>
 
-          <footer className="mt-6 rounded border bg-white p-3 text-sm text-slate-600">
+          <footer className="mt-6 rounded border bg-white p-3 text-sm text-slate-600 print:hidden">
             {APP_NAME} · v{APP_VERSION} · {APP_VERSION_DATE}
           </footer>
         </div>
