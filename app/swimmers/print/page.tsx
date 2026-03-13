@@ -3,6 +3,7 @@ import { APP_NAME, APP_VERSION } from "@/lib/constants";
 import { requireSessionUser } from "@/lib/auth";
 import { requirePreferredChallengeForUser } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
+import { PrintButton } from "./print-button";
 
 export const dynamic = "force-dynamic";
 
@@ -95,9 +96,7 @@ export default async function SwimmersPrintPage({
 
       <div className="mb-4 flex items-center justify-between print:hidden">
         <h1 className="text-lg font-semibold">Prévisualisation impression — Liste des nageurs</h1>
-        <button type="button" onClick={() => window.print()} className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white">
-          Imprimer / Enregistrer en PDF
-        </button>
+        <PrintButton />
       </div>
 
       <div className="mx-auto max-w-[1120px] space-y-4 print:max-w-none print:space-y-0">
