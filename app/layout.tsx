@@ -35,7 +35,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="fr">
       <body className="bg-slate-50 text-slate-900">
         <div className="mx-auto flex min-h-screen max-w-6xl flex-col p-6">
-          <header className="mb-6 flex items-center justify-between rounded border bg-white p-4">
+          <header className="mb-6 flex items-center justify-between rounded border bg-white p-4 print:hidden">
             <div>
               <p className="text-sm text-slate-500">Événement actif</p>
               <p className="text-xl font-semibold">{activeChallenge?.name ?? "Aucun événement actif"}</p>

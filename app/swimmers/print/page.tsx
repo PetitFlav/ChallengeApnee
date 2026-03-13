@@ -7,7 +7,7 @@ import { PrintButton } from "./print-button";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_ROWS_PER_PAGE = 24;
+const DEFAULT_ROWS_PER_PAGE = 20;
 const MIN_ROWS_PER_PAGE = 8;
 const MAX_ROWS_PER_PAGE = 80;
 
