@@ -38,10 +38,11 @@ function CountingSheetTemplate({ sheet }: { sheet: CountingSheetData }) {
 
         <div className="grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-1">
           <p className="font-semibold">
-            Type ligne : <span className="font-bold">{sheet.laneType}</span>
+            Type ligne : <span className="text-sm font-extrabold">{sheet.laneType}</span>
           </p>
-          <p className="justify-self-end font-semibold">Tournée : {sheet.roundLabel}</p>
-          <p className="col-span-2 font-semibold">Identifiant ligne : {sheet.laneCode}</p>
+          <p className="col-span-2 font-semibold">
+            Identifiant ligne : <span className="text-base font-extrabold">{sheet.laneCode}</span>
+          </p>
         </div>
       </header>
 
@@ -49,7 +50,7 @@ function CountingSheetTemplate({ sheet }: { sheet: CountingSheetData }) {
         <thead>
           <tr>
             <th className="w-[50px] border border-slate-900 px-1 py-1 text-left font-semibold leading-tight">Numéro nageur</th>
-            <th className="border border-slate-900 px-1 py-1 text-center text-[20px] font-semibold">Tournée ...</th>
+            <th className="border border-slate-900 px-1 py-1 text-center text-[20px] font-semibold">Tournée {sheet.roundLabel}</th>
             <th className="w-[42px] border border-slate-900 px-1 py-1 text-center font-semibold">Multi ligne</th>
           </tr>
         </thead>
@@ -184,7 +185,7 @@ export default async function CountingSheetsPrintPage({ params }: { params: { id
           }
 
           .counting-sheet-column--right {
-            border-left: 1px solid rgb(15 23 42);
+            border-left: 1px dashed rgb(15 23 42);
             padding-left: 1mm;
           }
 
