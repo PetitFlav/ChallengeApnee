@@ -8,7 +8,7 @@ import { PrintButton } from "@/app/swimmers/print/print-button";
 export const dynamic = "force-dynamic";
 
 const ROWS_PER_SHEET = 16;
-const COUNT_BOXES_PER_ROW = 12;
+const COUNT_BOXES_PER_ROW = 10;
 
 function CountingSheetTemplate() {
   return (
@@ -33,7 +33,7 @@ function CountingSheetTemplate() {
           <tr>
             <th className="w-[62px] border border-slate-900 px-1.5 py-1 text-left font-semibold leading-tight">Numéro nageur</th>
             <th className="border border-slate-900 px-1 py-1 text-center text-[20px] font-semibold">Tournée ...</th>
-            <th className="w-[54px] border border-slate-900 px-1 py-1 text-center font-semibold">Totaux</th>
+            <th className="w-[54px] border border-slate-900 px-1 py-1 text-center font-semibold">Multi ligne</th>
           </tr>
         </thead>
         <tbody>
@@ -41,27 +41,24 @@ function CountingSheetTemplate() {
             <tr key={`row-${rowIndex + 1}`}>
               <td className="border border-slate-900 px-1">&nbsp;</td>
               <td className="border border-slate-900 px-1 py-[2px]">
-                <div className="flex justify-center gap-[8px]">
+                <div className="flex justify-center gap-[5px]">
                   {Array.from({ length: COUNT_BOXES_PER_ROW }, (_, boxIndex) => (
                     <span
                       key={`box-${rowIndex + 1}-${boxIndex + 1}`}
-                      className="inline-block h-[14px] w-[14px] border border-dotted border-slate-700"
+                      className="inline-block h-[18px] w-[18px] border border-slate-700"
                     />
                   ))}
                 </div>
               </td>
-              <td className="border border-slate-900 px-1">&nbsp;</td>
+              <td className="border border-slate-900 px-1 py-[2px]">
+                <div className="flex justify-center">
+                  <span className="inline-block h-[16px] w-[16px] border border-slate-900" />
+                </div>
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
-
-      <footer className="mt-3 flex justify-end text-[10px] font-semibold">
-        <div className="flex items-center gap-1">
-          <span>Total Feuille :</span>
-          <span className="inline-block h-[28px] w-[72px] border-[3px] border-slate-900" />
-        </div>
-      </footer>
     </article>
   );
 }
@@ -87,6 +84,12 @@ export default async function CountingSheetsPrintPage({ params }: { params: { id
         }
 
         @media print {
+          html,
+          body {
+            margin: 0;
+            padding: 0;
+          }
+
           *,
           *::before,
           *::after {
@@ -100,12 +103,8 @@ export default async function CountingSheetsPrintPage({ params }: { params: { id
           .print-page {
             width: 194mm;
             height: 281mm;
-            break-after: page;
-            break-inside: avoid;
-          }
-
-          .print-page:last-child {
             break-after: auto;
+            break-inside: avoid;
           }
 
           .counting-sheets-grid {
