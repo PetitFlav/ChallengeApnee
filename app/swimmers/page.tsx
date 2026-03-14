@@ -450,9 +450,18 @@ export default async function SwimmersPage({
       </section>
 
       <section className="rounded border bg-white p-4">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-xl font-medium">Liste des nageurs</h2>
-          <form className="flex gap-2" method="get">
+          <div className="flex items-center gap-2">
+            <a
+              href="/swimmers/print"
+              target="_blank"
+              rel="noreferrer"
+              className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+            >
+              Imprimer (PDF)
+            </a>
+            <form className="flex gap-2" method="get">
             <input
               name="q"
               defaultValue={query}
@@ -462,7 +471,8 @@ export default async function SwimmersPage({
             <button type="submit" disabled={isArchived} className="rounded bg-slate-800 px-3 text-white disabled:cursor-not-allowed disabled:bg-slate-400">
               Rechercher
             </button>
-          </form>
+            </form>
+          </div>
         </div>
         <div className="space-y-3">
           {swimmers.map((swimmer) => (
