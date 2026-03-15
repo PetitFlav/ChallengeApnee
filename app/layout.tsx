@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ensureActiveChallenge } from "@/lib/events";
 import { APP_NAME, APP_VERSION, APP_VERSION_DATE } from "@/lib/constants";
+import { GlobalPendingOverlay } from "./global-pending-overlay";
 
 export const metadata: Metadata = {
   title: "Challenge Apnée",
@@ -46,6 +47,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </header>
 
           <main className="flex-1">{children}</main>
+
+          <GlobalPendingOverlay />
 
           <footer className="mt-6 rounded border bg-white p-3 text-sm text-slate-600 print:hidden">
             {APP_NAME} · v{APP_VERSION} · {APP_VERSION_DATE}

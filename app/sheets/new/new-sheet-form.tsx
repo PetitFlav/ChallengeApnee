@@ -56,17 +56,20 @@ type Props = {
   disabled?: boolean;
 };
 
-const EMPTY_ROW: SheetRow = {
-  swimmerNumber: "",
-  squares: "",
-  ticks: "",
-};
+function createEmptyRow(): SheetRow {
+  return {
+    swimmerNumber: "",
+    squares: "",
+    ticks: "",
+  };
+}
 
 export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, disabled = false }: Props) {
   const [state, formAction] = useFormState(action, { error: null, success: null, loadedSheetId: null, nextRoundId: null });
   const [roundId, setRoundId] = useState("");
   const [laneId, setLaneId] = useState("");
-  const [rows, setRows] = useState<SheetRow[]>([EMPTY_ROW, EMPTY_ROW, EMPTY_ROW, EMPTY_ROW]);
+  const [rows, setRows] = useState<SheetRow[]>([createEmptyRow(), createEmptyRow(), createEmptyRow(), createEmptyRow()]);
+  const [isDeleteEnabled, setIsDeleteEnabled] = useState(false);
   const [loadedMessage, setLoadedMessage] = useState<string | null>(null);
   const [roundSelectionMessage, setRoundSelectionMessage] = useState<string | null>(null);
 
@@ -86,6 +89,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
     () => existingSheets.find((sheet) => sheet.roundId === roundId && sheet.laneId === laneId) ?? null,
     [existingSheets, laneId, roundId],
   );
+  const selectedSheetId = selectedSheet?.id ?? null;
 
   const normalizedRows = useMemo(() => {
     return rows
@@ -130,14 +134,20 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
     }
 
     if (!selectedSheet) {
-      setRows([EMPTY_ROW, EMPTY_ROW, EMPTY_ROW, EMPTY_ROW]);
+      setRows([createEmptyRow(), createEmptyRow(), createEmptyRow(), createEmptyRow()]);
+      setIsDeleteEnabled(false);
       setLoadedMessage(null);
       return;
     }
 
-    setRows(selectedSheet.rows.length > 0 ? selectedSheet.rows : [EMPTY_ROW]);
+    setRows(
+      selectedSheet.rows.length > 0
+        ? selectedSheet.rows.map((row) => ({ ...row }))
+        : [createEmptyRow()],
+    );
+    setIsDeleteEnabled(false);
     setLoadedMessage("Feuille existante chargée : vous pouvez modifier, supprimer ou ajouter des lignes nageur.");
-  }, [laneId, roundId, selectedSheet]);
+  }, [laneId, roundId, selectedSheet, selectedSheetId]);
 
   useEffect(() => {
     if (!state.success) return;
@@ -145,7 +155,8 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
     if (state.nextRoundId) {
       setRoundId(state.nextRoundId);
       setLaneId("");
-      setRows([EMPTY_ROW, EMPTY_ROW, EMPTY_ROW, EMPTY_ROW]);
+      setRows([createEmptyRow(), createEmptyRow(), createEmptyRow(), createEmptyRow()]);
+      setIsDeleteEnabled(false);
       setLoadedMessage(null);
       return;
     }
@@ -157,12 +168,20 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
 
     setRoundId("");
     setLaneId("");
-    setRows([EMPTY_ROW, EMPTY_ROW, EMPTY_ROW, EMPTY_ROW]);
+    setRows([createEmptyRow(), createEmptyRow(), createEmptyRow(), createEmptyRow()]);
+    setIsDeleteEnabled(false);
     setLoadedMessage(null);
   }, [state.loadedSheetId, state.nextRoundId, state.success]);
 
   function updateRow(index: number, patch: Partial<SheetRow>) {
     setRows((previousRows) => previousRows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
+  }
+
+  function removeRow(index: number) {
+    setRows((previousRows) => {
+      const nextRows = previousRows.filter((_item, rowIndex) => rowIndex !== index);
+      return nextRows.length > 0 ? nextRows : [createEmptyRow()];
+    });
   }
 
   const hasInProgressSheet = Boolean(roundId && laneId && normalizedRows.length > 0);
@@ -275,7 +294,17 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
               <th className="p-2 text-left">Section</th>
               <th className="p-2 text-left">Total longueurs</th>
               <th className="p-2 text-left">Distance</th>
-              <th className="p-2 text-left">Action</th>
+              <th className="p-2 text-left">
+                <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={isDeleteEnabled}
+                    disabled={isEntryLocked}
+                    onChange={(event) => setIsDeleteEnabled(event.target.checked)}
+                  />
+                  Activer suppression
+                </label>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -329,8 +358,8 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
                   <td className="p-2">
                     <button
                       type="button"
-                      onClick={() => setRows((previousRows) => previousRows.filter((_item, rowIndex) => rowIndex !== index))}
-                      disabled={isEntryLocked || rows.length <= 1}
+                      onClick={() => removeRow(index)}
+                      disabled={isEntryLocked || !isDeleteEnabled}
                       className="rounded bg-red-600 px-2 py-1 text-xs text-white disabled:cursor-not-allowed disabled:bg-slate-300"
                     >
                       Supprimer
@@ -347,7 +376,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
 
       <button
         type="button"
-        onClick={() => setRows((previousRows) => [...previousRows, EMPTY_ROW])}
+        onClick={() => setRows((previousRows) => [...previousRows, createEmptyRow()])}
         disabled={isEntryLocked}
         className="rounded border border-slate-300 px-3 py-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
       >

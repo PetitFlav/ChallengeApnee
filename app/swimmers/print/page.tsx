@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 const DEFAULT_ROWS_PER_PAGE = 20;
 const MIN_ROWS_PER_PAGE = 8;
 const MAX_ROWS_PER_PAGE = 80;
+const MAX_EXTRA_PAGES = 50;
 
 type PrintableRow = {
   number: number;
@@ -25,6 +26,14 @@ function parseRowsPerPage(value: string | undefined) {
   return Math.min(Math.max(parsed, MIN_ROWS_PER_PAGE), MAX_ROWS_PER_PAGE);
 }
 
+function parseExtraPages(value: string | undefined) {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed)) return 0;
+
+  return Math.min(Math.max(parsed, 0), MAX_EXTRA_PAGES);
+}
+
 function chunkRows(rows: PrintableRow[], chunkSize: number) {
   const chunks: PrintableRow[][] = [];
 
@@ -38,9 +47,10 @@ function chunkRows(rows: PrintableRow[], chunkSize: number) {
 export default async function SwimmersPrintPage({
   searchParams,
 }: {
-  searchParams?: { rowsPerPage?: string };
+  searchParams?: { rowsPerPage?: string; extraPages?: string };
 }) {
   const rowsPerPage = parseRowsPerPage(searchParams?.rowsPerPage);
+  const extraPages = parseExtraPages(searchParams?.extraPages);
   const rowsPerColumn = Math.ceil(rowsPerPage / 2);
 
   const user = await requireSessionUser();
@@ -54,7 +64,8 @@ export default async function SwimmersPrintPage({
 
   const maxSwimmerNumber = swimmers.length > 0 ? swimmers[swimmers.length - 1].number : 0;
   const minimumRows = Math.max(swimmers.length, rowsPerPage);
-  const printableRowsCount = Math.ceil(minimumRows / rowsPerPage) * rowsPerPage;
+  const currentPages = Math.ceil(minimumRows / rowsPerPage);
+  const printableRowsCount = (currentPages + extraPages) * rowsPerPage;
 
   const printableRows: PrintableRow[] = [
     ...swimmers.map((swimmer) => ({
@@ -96,7 +107,7 @@ export default async function SwimmersPrintPage({
 
       <div className="mb-4 flex items-center justify-between print:hidden">
         <h1 className="text-lg font-semibold">Prévisualisation impression — Liste des nageurs</h1>
-        <PrintButton />
+        <PrintButton currentPages={currentPages} extraPages={extraPages} />
       </div>
 
       <div className="mx-auto max-w-[1120px] space-y-4 print:max-w-none print:space-y-0">
