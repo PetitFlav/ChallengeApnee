@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 function isInternalNavigableLink(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -27,11 +27,22 @@ export function GlobalPendingOverlay() {
   const searchParams = useSearchParams();
   const [manualPending, setManualPending] = useState(false);
   const [inFlightRequests, setInFlightRequests] = useState(0);
-  const releaseTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     setManualPending(false);
   }, [pathname, searchParams]);
+
+  useEffect(() => {
+    if (inFlightRequests > 0) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setManualPending(false);
+    }, 150);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [inFlightRequests]);
 
   useEffect(() => {
     const onSubmit = () => {
@@ -82,27 +93,6 @@ export function GlobalPendingOverlay() {
   }, []);
 
   const isPending = useMemo(() => manualPending || inFlightRequests > 0, [inFlightRequests, manualPending]);
-
-  useEffect(() => {
-    if (releaseTimeoutRef.current) {
-      window.clearTimeout(releaseTimeoutRef.current);
-      releaseTimeoutRef.current = null;
-    }
-
-    if (isPending) return;
-
-    releaseTimeoutRef.current = window.setTimeout(() => {
-      setManualPending(false);
-      releaseTimeoutRef.current = null;
-    }, 150);
-
-    return () => {
-      if (releaseTimeoutRef.current) {
-        window.clearTimeout(releaseTimeoutRef.current);
-        releaseTimeoutRef.current = null;
-      }
-    };
-  }, [isPending]);
 
   useEffect(() => {
     if (!isPending) {
