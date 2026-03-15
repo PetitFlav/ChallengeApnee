@@ -67,6 +67,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
   const [roundId, setRoundId] = useState("");
   const [laneId, setLaneId] = useState("");
   const [rows, setRows] = useState<SheetRow[]>([EMPTY_ROW, EMPTY_ROW, EMPTY_ROW, EMPTY_ROW]);
+  const [isDeleteEnabled, setIsDeleteEnabled] = useState(false);
   const [loadedMessage, setLoadedMessage] = useState<string | null>(null);
   const [roundSelectionMessage, setRoundSelectionMessage] = useState<string | null>(null);
 
@@ -131,11 +132,13 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
 
     if (!selectedSheet) {
       setRows([EMPTY_ROW, EMPTY_ROW, EMPTY_ROW, EMPTY_ROW]);
+      setIsDeleteEnabled(false);
       setLoadedMessage(null);
       return;
     }
 
     setRows(selectedSheet.rows.length > 0 ? selectedSheet.rows : [EMPTY_ROW]);
+    setIsDeleteEnabled(false);
     setLoadedMessage("Feuille existante chargée : vous pouvez modifier, supprimer ou ajouter des lignes nageur.");
   }, [laneId, roundId, selectedSheet]);
 
@@ -146,6 +149,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
       setRoundId(state.nextRoundId);
       setLaneId("");
       setRows([EMPTY_ROW, EMPTY_ROW, EMPTY_ROW, EMPTY_ROW]);
+      setIsDeleteEnabled(false);
       setLoadedMessage(null);
       return;
     }
@@ -158,6 +162,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
     setRoundId("");
     setLaneId("");
     setRows([EMPTY_ROW, EMPTY_ROW, EMPTY_ROW, EMPTY_ROW]);
+    setIsDeleteEnabled(false);
     setLoadedMessage(null);
   }, [state.loadedSheetId, state.nextRoundId, state.success]);
 
@@ -275,7 +280,17 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
               <th className="p-2 text-left">Section</th>
               <th className="p-2 text-left">Total longueurs</th>
               <th className="p-2 text-left">Distance</th>
-              <th className="p-2 text-left">Action</th>
+              <th className="p-2 text-left">
+                <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={isDeleteEnabled}
+                    disabled={isEntryLocked}
+                    onChange={(event) => setIsDeleteEnabled(event.target.checked)}
+                  />
+                  Activer suppression
+                </label>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -330,7 +345,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
                     <button
                       type="button"
                       onClick={() => setRows((previousRows) => previousRows.filter((_item, rowIndex) => rowIndex !== index))}
-                      disabled={isEntryLocked || rows.length <= 1}
+                      disabled={isEntryLocked || !isDeleteEnabled || rows.length <= 1}
                       className="rounded bg-red-600 px-2 py-1 text-xs text-white disabled:cursor-not-allowed disabled:bg-slate-300"
                     >
                       Supprimer
