@@ -177,6 +177,13 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
     setRows((previousRows) => previousRows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
   }
 
+  function removeRow(index: number) {
+    setRows((previousRows) => {
+      const nextRows = previousRows.filter((_item, rowIndex) => rowIndex !== index);
+      return nextRows.length > 0 ? nextRows : [createEmptyRow()];
+    });
+  }
+
   const hasInProgressSheet = Boolean(roundId && laneId && normalizedRows.length > 0);
   const isEntryLocked = disabled || !roundId || !laneId;
 
@@ -351,8 +358,8 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
                   <td className="p-2">
                     <button
                       type="button"
-                      onClick={() => setRows((previousRows) => previousRows.filter((_item, rowIndex) => rowIndex !== index))}
-                      disabled={isEntryLocked || !isDeleteEnabled || rows.length <= 1}
+                      onClick={() => removeRow(index)}
+                      disabled={isEntryLocked || !isDeleteEnabled}
                       className="rounded bg-red-600 px-2 py-1 text-xs text-white disabled:cursor-not-allowed disabled:bg-slate-300"
                     >
                       Supprimer
