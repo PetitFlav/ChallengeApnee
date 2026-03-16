@@ -1,5 +1,6 @@
 import Image from "next/image";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { ensureActiveChallenge } from "@/lib/events";
 import { APP_NAME, APP_VERSION, APP_VERSION_DATE } from "@/lib/constants";
@@ -48,7 +49,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
           <main className="flex-1">{children}</main>
 
-          <GlobalPendingOverlay />
+          <Suspense fallback={null}>
+            <GlobalPendingOverlay />
+          </Suspense>
 
           <footer className="mt-6 rounded border bg-white p-3 text-sm text-slate-600 print:hidden">
             {APP_NAME} · v{APP_VERSION} · {APP_VERSION_DATE}

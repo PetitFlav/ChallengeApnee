@@ -47,10 +47,11 @@ function chunkRows(rows: PrintableRow[], chunkSize: number) {
 export default async function SwimmersPrintPage({
   searchParams,
 }: {
-  searchParams?: { rowsPerPage?: string; extraPages?: string };
+  searchParams?: Promise<{ rowsPerPage?: string; extraPages?: string }>;
 }) {
-  const rowsPerPage = parseRowsPerPage(searchParams?.rowsPerPage);
-  const extraPages = parseExtraPages(searchParams?.extraPages);
+  const resolvedSearchParams = await searchParams;
+  const rowsPerPage = parseRowsPerPage(resolvedSearchParams?.rowsPerPage);
+  const extraPages = parseExtraPages(resolvedSearchParams?.extraPages);
   const rowsPerColumn = Math.ceil(rowsPerPage / 2);
 
   const user = await requireSessionUser();
