@@ -59,14 +59,14 @@ export function PublicLiveScreen({
     const startValue = displayedDistanceRef.current;
     const distanceDelta = targetDistanceM - startValue;
 
-    if (distanceDelta <= 0) {
+    if (distanceDelta === 0) {
       setDisplayedDistanceM(targetDistanceM);
       return;
     }
 
     const durationMs = Math.min(
       MAX_ANIMATION_DURATION_MS,
-      Math.max(MIN_ANIMATION_DURATION_MS, (distanceDelta / METERS_PER_SECOND) * 1000),
+      Math.max(MIN_ANIMATION_DURATION_MS, (Math.abs(distanceDelta) / METERS_PER_SECOND) * 1000),
     );
 
     const animationStartedAt = performance.now();
@@ -115,7 +115,7 @@ export function PublicLiveScreen({
         const payload = (await response.json()) as PublicDataPayload;
         if (isCancelled) return;
 
-        setTargetDistanceM((current) => Math.max(current, payload.totalDistanceM));
+        setTargetDistanceM(payload.totalDistanceM);
         setUpdatedAtLabel(formatClock(new Date(payload.updatedAt)));
       } catch {
         // Keep previous values for robustness on transient errors.
