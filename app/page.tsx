@@ -16,6 +16,7 @@ const links = [
   { href: "/sheets", label: "Vérification" },
   { href: "/sheets/new", label: "Saisie des longueurs" },
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/statistics", label: "Statistique" },
   { href: "/public", label: "Écran public" },
 ] as const;
 
@@ -76,6 +77,7 @@ export default async function HomePage({ searchParams }: { searchParams?: { mess
             (link.href === "/sheets" && !canAccessVerification) ||
             (link.href === "/sheets/new" && !canAccessLengthsEntry) ||
             (link.href === "/dashboard" && !canAccessDashboard) ||
+            (link.href === "/statistics" && !canAccessDashboard) ||
             (link.href === "/public" && !canAccessPublicScreen);
 
           if (isDisabled) {
