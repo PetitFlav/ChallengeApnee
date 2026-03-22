@@ -10,6 +10,7 @@ import {
   type DashboardSwimmerStatus,
 } from "@/lib/verification";
 import { VerificationDashboard } from "./verification-dashboard";
+import { StatisticsPanel } from "./statistics-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -333,6 +334,16 @@ export default async function DashboardPage() {
           ticks: true,
           totalLengths: true,
           distanceM: true,
+          swimmer: {
+            select: {
+              number: true,
+              firstName: true,
+              lastName: true,
+              club: { select: { name: true } },
+              section: { select: { name: true } },
+            },
+          },
+          lane: { select: { distanceM: true } },
           validatedAt: true,
           validatedBy: { select: { firstName: true, lastName: true } },
         },
@@ -502,6 +513,86 @@ export default async function DashboardPage() {
       };
     });
 
+    const swimmerStatisticsMap = new Map<
+      string,
+      {
+        swimmerId: string;
+        number: number;
+        firstName: string;
+        lastName: string;
+        club: string;
+        section: string;
+        total25M: number;
+        total50M: number;
+        totalDistanceM: number;
+      }
+    >();
+    const appliedLineKeys = new Set<string>();
+
+    for (const round of rounds) {
+      for (const sheet of round.sheets) {
+        for (const entry of sheet.entries) {
+          const swimmerId = entry.swimmer.id;
+          const lineKey = `${round.id}-${sheet.lane.id}-${swimmerId}`;
+          const effectiveDistance = finalDistanceByKey.get(lineKey) ?? entry.distanceM;
+          const existing = swimmerStatisticsMap.get(swimmerId);
+
+          if (existing) {
+            existing.totalDistanceM += effectiveDistance;
+            if (sheet.lane.distanceM === 25) existing.total25M += effectiveDistance;
+            if (sheet.lane.distanceM === 50) existing.total50M += effectiveDistance;
+          } else {
+            swimmerStatisticsMap.set(swimmerId, {
+              swimmerId,
+              number: entry.swimmer.number,
+              firstName: entry.swimmer.firstName,
+              lastName: entry.swimmer.lastName,
+              club: entry.swimmer.club?.name ?? "",
+              section: entry.swimmer.section?.name ?? "",
+              total25M: sheet.lane.distanceM === 25 ? effectiveDistance : 0,
+              total50M: sheet.lane.distanceM === 50 ? effectiveDistance : 0,
+              totalDistanceM: effectiveDistance,
+            });
+          }
+
+          appliedLineKeys.add(lineKey);
+        }
+      }
+    }
+
+    for (const result of finalResults) {
+      const lineKey = `${result.roundId}-${result.laneId}-${result.swimmerId}`;
+      if (appliedLineKeys.has(lineKey)) continue;
+
+      const existing = swimmerStatisticsMap.get(result.swimmerId);
+      const laneDistance = result.lane.distanceM;
+
+      if (existing) {
+        existing.totalDistanceM += result.distanceM;
+        if (laneDistance === 25) existing.total25M += result.distanceM;
+        if (laneDistance === 50) existing.total50M += result.distanceM;
+      } else {
+        swimmerStatisticsMap.set(result.swimmerId, {
+          swimmerId: result.swimmerId,
+          number: result.swimmer.number,
+          firstName: result.swimmer.firstName,
+          lastName: result.swimmer.lastName,
+          club: result.swimmer.club?.name ?? "",
+          section: result.swimmer.section?.name ?? "",
+          total25M: laneDistance === 25 ? result.distanceM : 0,
+          total50M: laneDistance === 50 ? result.distanceM : 0,
+          totalDistanceM: result.distanceM,
+        });
+      }
+    }
+
+    const swimmerStatistics = Array.from(swimmerStatisticsMap.values()).sort(
+      (a, b) => a.number - b.number || a.lastName.localeCompare(b.lastName, "fr") || a.firstName.localeCompare(b.firstName, "fr"),
+    );
+    const totalEvent25M = swimmerStatistics.reduce((sum, swimmer) => sum + swimmer.total25M, 0);
+    const totalEvent50M = swimmerStatistics.reduce((sum, swimmer) => sum + swimmer.total50M, 0);
+    const totalEventDistanceM = swimmerStatistics.reduce((sum, swimmer) => sum + swimmer.totalDistanceM, 0);
+
     const distanceKm = distanceM / 1000;
 
     const totalLines = sheetEntries.length;
@@ -557,6 +648,17 @@ export default async function DashboardPage() {
             <p className="mt-2 text-sm text-slate-600">Feuilles validées : {validatedSheetsCount}</p>
           </article>
         </section>
+
+        <StatisticsPanel
+          challengeName={challenge.name}
+          challengeDateLabel={challenge.eventDate.toLocaleDateString("fr-FR")}
+          clubOrganisateur={challenge.clubOrganisateur}
+          clubOrganisateurLogo={challenge.clubOrganisateurLogo}
+          rows={swimmerStatistics}
+          totalEvent25M={totalEvent25M}
+          totalEvent50M={totalEvent50M}
+          totalEventDistanceM={totalEventDistanceM}
+        />
 
         <VerificationDashboard
           rounds={verificationRounds}
