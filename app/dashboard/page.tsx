@@ -247,7 +247,7 @@ export default async function DashboardPage() {
       revalidatePath("/dashboard");
     }
 
-    const [sheetEntries, validatedSheetsCount, rounds, finalResults] = await Promise.all([
+    const [sheetEntries, rounds, finalResults] = await Promise.all([
       prisma.sheetEntry.findMany({
         where: { sheet: { challengeId: challenge.id } },
         select: {
@@ -255,9 +255,6 @@ export default async function DashboardPage() {
           distanceM: true,
           sheet: { select: { roundId: true, laneId: true } },
         },
-      }),
-      prisma.sheet.count({
-        where: { challengeId: challenge.id, status: "VALIDATED" },
       }),
       prisma.round.findMany({
         where: { challengeId: challenge.id },
@@ -349,18 +346,6 @@ export default async function DashboardPage() {
         },
       }),
     ]);
-
-    const initialDistanceByKey = new Map(
-      sheetEntries.map((entry) => [`${entry.sheet.roundId}-${entry.sheet.laneId}-${entry.swimmerId}`, entry.distanceM]),
-    );
-    const finalDistanceByKey = new Map(finalResults.map((result) => [`${result.roundId}-${result.laneId}-${result.swimmerId}`, result.distanceM]));
-
-    const allLineKeys = new Set([...initialDistanceByKey.keys(), ...finalDistanceByKey.keys()]);
-
-    let distanceM = 0;
-    for (const key of allLineKeys) {
-      distanceM += finalDistanceByKey.get(key) ?? initialDistanceByKey.get(key) ?? 0;
-    }
 
     const finalResultByKey = new Map(
       finalResults.map((result) => [
@@ -513,88 +498,6 @@ export default async function DashboardPage() {
       };
     });
 
-    const swimmerStatisticsMap = new Map<
-      string,
-      {
-        swimmerId: string;
-        number: number;
-        firstName: string;
-        lastName: string;
-        club: string;
-        section: string;
-        total25M: number;
-        total50M: number;
-        totalDistanceM: number;
-      }
-    >();
-    const appliedLineKeys = new Set<string>();
-
-    for (const round of rounds) {
-      for (const sheet of round.sheets) {
-        for (const entry of sheet.entries) {
-          const swimmerId = entry.swimmer.id;
-          const lineKey = `${round.id}-${sheet.lane.id}-${swimmerId}`;
-          const effectiveDistance = finalDistanceByKey.get(lineKey) ?? entry.distanceM;
-          const existing = swimmerStatisticsMap.get(swimmerId);
-
-          if (existing) {
-            existing.totalDistanceM += effectiveDistance;
-            if (sheet.lane.distanceM === 25) existing.total25M += effectiveDistance;
-            if (sheet.lane.distanceM === 50) existing.total50M += effectiveDistance;
-          } else {
-            swimmerStatisticsMap.set(swimmerId, {
-              swimmerId,
-              number: entry.swimmer.number,
-              firstName: entry.swimmer.firstName,
-              lastName: entry.swimmer.lastName,
-              club: entry.swimmer.club?.name ?? "",
-              section: entry.swimmer.section?.name ?? "",
-              total25M: sheet.lane.distanceM === 25 ? effectiveDistance : 0,
-              total50M: sheet.lane.distanceM === 50 ? effectiveDistance : 0,
-              totalDistanceM: effectiveDistance,
-            });
-          }
-
-          appliedLineKeys.add(lineKey);
-        }
-      }
-    }
-
-    for (const result of finalResults) {
-      const lineKey = `${result.roundId}-${result.laneId}-${result.swimmerId}`;
-      if (appliedLineKeys.has(lineKey)) continue;
-
-      const existing = swimmerStatisticsMap.get(result.swimmerId);
-      const laneDistance = result.lane.distanceM;
-
-      if (existing) {
-        existing.totalDistanceM += result.distanceM;
-        if (laneDistance === 25) existing.total25M += result.distanceM;
-        if (laneDistance === 50) existing.total50M += result.distanceM;
-      } else {
-        swimmerStatisticsMap.set(result.swimmerId, {
-          swimmerId: result.swimmerId,
-          number: result.swimmer.number,
-          firstName: result.swimmer.firstName,
-          lastName: result.swimmer.lastName,
-          club: result.swimmer.club?.name ?? "",
-          section: result.swimmer.section?.name ?? "",
-          total25M: laneDistance === 25 ? result.distanceM : 0,
-          total50M: laneDistance === 50 ? result.distanceM : 0,
-          totalDistanceM: result.distanceM,
-        });
-      }
-    }
-
-    const swimmerStatistics = Array.from(swimmerStatisticsMap.values()).sort(
-      (a, b) => a.number - b.number || a.lastName.localeCompare(b.lastName, "fr") || a.firstName.localeCompare(b.firstName, "fr"),
-    );
-    const totalEvent25M = swimmerStatistics.reduce((sum, swimmer) => sum + swimmer.total25M, 0);
-    const totalEvent50M = swimmerStatistics.reduce((sum, swimmer) => sum + swimmer.total50M, 0);
-    const totalEventDistanceM = swimmerStatistics.reduce((sum, swimmer) => sum + swimmer.totalDistanceM, 0);
-
-    const distanceKm = distanceM / 1000;
-
     const totalLines = sheetEntries.length;
     const verifiedLines = rounds.reduce(
       (sum, round) =>
@@ -626,27 +529,18 @@ export default async function DashboardPage() {
         <BackToMainMenuLink />
         <div>
           <h1 className="text-3xl font-semibold">Dashboard</h1>
-          <p className="text-slate-600">Vue événement, cumul des distances et contrôle des vérifications.</p>
+          <p className="text-slate-600">Vue de contrôle dédiée aux vérifications, écarts, validations et statuts.</p>
         </div>
 
-        <section className="grid gap-4 md:grid-cols-2">
-          <article className="rounded border bg-white p-4">
-            <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">Événement</h2>
-            <p className="mt-2 text-xl font-semibold text-slate-900">{challenge.name}</p>
-            <p className="text-slate-600">
-              {challenge.eventDate.toLocaleDateString("fr-FR")} · début {challenge.startTime} · durée {challenge.durationMinutes} min
-            </p>
-            <p className="text-slate-600">
-              {challenge.roundsCount} tournées · {challenge.lanes25Count} lignes 25m · {challenge.lanes50Count} lignes 50m
-            </p>
-          </article>
-
-          <article className="rounded border bg-white p-4">
-            <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">Total événement</h2>
-            <p className="mt-2 text-3xl font-bold text-blue-700">{distanceM.toLocaleString("fr-FR")} m</p>
-            <p className="text-slate-700">{distanceKm.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} km</p>
-            <p className="mt-2 text-sm text-slate-600">Feuilles validées : {validatedSheetsCount}</p>
-          </article>
+        <section className="rounded border bg-white p-4">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">Événement</h2>
+          <p className="mt-2 text-xl font-semibold text-slate-900">{challenge.name}</p>
+          <p className="text-slate-600">
+            {challenge.eventDate.toLocaleDateString("fr-FR")} · début {challenge.startTime} · durée {challenge.durationMinutes} min
+          </p>
+          <p className="text-slate-600">
+            {challenge.roundsCount} tournées · {challenge.lanes25Count} lignes 25m · {challenge.lanes50Count} lignes 50m
+          </p>
         </section>
 
         <StatisticsPanel
