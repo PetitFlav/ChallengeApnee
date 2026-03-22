@@ -246,7 +246,7 @@ export default async function DashboardPage() {
       revalidatePath("/dashboard");
     }
 
-    const [sheetEntries, validatedSheetsCount, rounds, finalResults] = await Promise.all([
+    const [sheetEntries, rounds, finalResults] = await Promise.all([
       prisma.sheetEntry.findMany({
         where: { sheet: { challengeId: challenge.id } },
         select: {
@@ -254,9 +254,6 @@ export default async function DashboardPage() {
           distanceM: true,
           sheet: { select: { roundId: true, laneId: true } },
         },
-      }),
-      prisma.sheet.count({
-        where: { challengeId: challenge.id, status: "VALIDATED" },
       }),
       prisma.round.findMany({
         where: { challengeId: challenge.id },
@@ -338,18 +335,6 @@ export default async function DashboardPage() {
         },
       }),
     ]);
-
-    const initialDistanceByKey = new Map(
-      sheetEntries.map((entry) => [`${entry.sheet.roundId}-${entry.sheet.laneId}-${entry.swimmerId}`, entry.distanceM]),
-    );
-    const finalDistanceByKey = new Map(finalResults.map((result) => [`${result.roundId}-${result.laneId}-${result.swimmerId}`, result.distanceM]));
-
-    const allLineKeys = new Set([...initialDistanceByKey.keys(), ...finalDistanceByKey.keys()]);
-
-    let distanceM = 0;
-    for (const key of allLineKeys) {
-      distanceM += finalDistanceByKey.get(key) ?? initialDistanceByKey.get(key) ?? 0;
-    }
 
     const finalResultByKey = new Map(
       finalResults.map((result) => [
@@ -502,8 +487,6 @@ export default async function DashboardPage() {
       };
     });
 
-    const distanceKm = distanceM / 1000;
-
     const totalLines = sheetEntries.length;
     const verifiedLines = rounds.reduce(
       (sum, round) =>
@@ -535,27 +518,18 @@ export default async function DashboardPage() {
         <BackToMainMenuLink />
         <div>
           <h1 className="text-3xl font-semibold">Dashboard</h1>
-          <p className="text-slate-600">Vue événement, cumul des distances et contrôle des vérifications.</p>
+          <p className="text-slate-600">Vue de contrôle dédiée aux vérifications, écarts, validations et statuts.</p>
         </div>
 
-        <section className="grid gap-4 md:grid-cols-2">
-          <article className="rounded border bg-white p-4">
-            <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">Événement</h2>
-            <p className="mt-2 text-xl font-semibold text-slate-900">{challenge.name}</p>
-            <p className="text-slate-600">
-              {challenge.eventDate.toLocaleDateString("fr-FR")} · début {challenge.startTime} · durée {challenge.durationMinutes} min
-            </p>
-            <p className="text-slate-600">
-              {challenge.roundsCount} tournées · {challenge.lanes25Count} lignes 25m · {challenge.lanes50Count} lignes 50m
-            </p>
-          </article>
-
-          <article className="rounded border bg-white p-4">
-            <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">Total événement</h2>
-            <p className="mt-2 text-3xl font-bold text-blue-700">{distanceM.toLocaleString("fr-FR")} m</p>
-            <p className="text-slate-700">{distanceKm.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} km</p>
-            <p className="mt-2 text-sm text-slate-600">Feuilles validées : {validatedSheetsCount}</p>
-          </article>
+        <section className="rounded border bg-white p-4">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">Événement</h2>
+          <p className="mt-2 text-xl font-semibold text-slate-900">{challenge.name}</p>
+          <p className="text-slate-600">
+            {challenge.eventDate.toLocaleDateString("fr-FR")} · début {challenge.startTime} · durée {challenge.durationMinutes} min
+          </p>
+          <p className="text-slate-600">
+            {challenge.roundsCount} tournées · {challenge.lanes25Count} lignes 25m · {challenge.lanes50Count} lignes 50m
+          </p>
         </section>
 
         <VerificationDashboard
