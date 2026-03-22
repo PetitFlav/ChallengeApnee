@@ -13,6 +13,7 @@ export type PermissionModule =
   | "verification"
   | "lengths-entry"
   | "dashboard"
+  | "statistics"
   | "public-screen"
   | "user-admin";
 
@@ -38,7 +39,7 @@ function canAccessModuleByMatrix(module: PermissionModule, context: PermissionCo
   }
 
   if (context.hasClosedChallenge) {
-    return module === "verification" || module === "lengths-entry" || module === "dashboard" || module === "public-screen";
+    return module === "verification" || module === "lengths-entry" || module === "dashboard" || module === "statistics" || module === "public-screen";
   }
 
   if (context.hasActiveChallenge) {

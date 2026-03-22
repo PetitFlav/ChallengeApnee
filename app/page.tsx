@@ -28,12 +28,13 @@ export default async function HomePage({ searchParams }: { searchParams?: { mess
 
   const challenge = await ensurePreferredChallengeForUser(user);
   const hasChallengeAccess = Boolean(challenge);
-  const [canAccessEvents, canAccessSwimmers, canAccessVerification, canAccessLengthsEntry, canAccessDashboard, canAccessPublicScreen, canAccessUserAdmin] = await Promise.all([
+  const [canAccessEvents, canAccessSwimmers, canAccessVerification, canAccessLengthsEntry, canAccessDashboard, canAccessStatistics, canAccessPublicScreen, canAccessUserAdmin] = await Promise.all([
     canAccessModule(user, "events"),
     canAccessModule(user, "swimmers"),
     canAccessModule(user, "verification"),
     canAccessModule(user, "lengths-entry"),
     canAccessModule(user, "dashboard"),
+    canAccessModule(user, "statistics"),
     canAccessModule(user, "public-screen"),
     canAccessModule(user, "user-admin"),
   ]);
@@ -77,7 +78,7 @@ export default async function HomePage({ searchParams }: { searchParams?: { mess
             (link.href === "/sheets" && !canAccessVerification) ||
             (link.href === "/sheets/new" && !canAccessLengthsEntry) ||
             (link.href === "/dashboard" && !canAccessDashboard) ||
-            (link.href === "/statistics" && !canAccessDashboard) ||
+            (link.href === "/statistics" && !canAccessStatistics) ||
             (link.href === "/public" && !canAccessPublicScreen);
 
           if (isDisabled) {

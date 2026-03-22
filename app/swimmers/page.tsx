@@ -454,12 +454,10 @@ export default async function SwimmersPage({
           <h2 className="text-xl font-medium">Liste des nageurs</h2>
           <div className="flex items-center gap-2">
             <a
-              href="/swimmers/print"
-              target="_blank"
-              rel="noreferrer"
+              href="/statistics"
               className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
             >
-              Imprimer (PDF)
+              Voir Statistique
             </a>
             <form className="flex gap-2" method="get">
             <input
