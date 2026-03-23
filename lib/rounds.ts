@@ -21,6 +21,7 @@ export type RoundAvailability = {
   closesAt: Date | null;
   status: "pending" | "active" | "closed";
   isSelectable: boolean;
+  isSelectableBySuperUser: boolean;
 };
 
 const DEFAULT_EVENT_TIMEZONE = "Europe/Paris";
@@ -203,6 +204,7 @@ export function buildRoundAvailability(
       closesAt,
       status,
       isSelectable: status === "active",
+      isSelectableBySuperUser: true,
     };
   });
 }

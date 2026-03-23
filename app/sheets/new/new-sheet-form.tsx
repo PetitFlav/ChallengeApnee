@@ -8,6 +8,7 @@ type RoundOption = {
   label: string;
   status: "pending" | "active" | "closed";
   isSelectable: boolean;
+  isSelectableBySuperUser: boolean;
   opensAtLabel: string;
   closesAtLabel: string;
 };
@@ -54,6 +55,7 @@ type Props = {
   existingSheets: ExistingSheet[];
   action: (state: CreateSheetState, formData: FormData) => Promise<CreateSheetState>;
   disabled?: boolean;
+  isSuperUser?: boolean;
 };
 
 function createEmptyRow(): SheetRow {
@@ -64,7 +66,7 @@ function createEmptyRow(): SheetRow {
   };
 }
 
-export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, disabled = false }: Props) {
+export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, disabled = false, isSuperUser = false }: Props) {
   const [state, formAction] = useFormState(action, { error: null, success: null, loadedSheetId: null, nextRoundId: null });
   const [roundId, setRoundId] = useState("");
   const [laneId, setLaneId] = useState("");
@@ -74,6 +76,13 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
   const [roundSelectionMessage, setRoundSelectionMessage] = useState<string | null>(null);
 
   const activeRound = useMemo(() => rounds.find((round) => round.status === "active") ?? null, [rounds]);
+  const defaultRound = useMemo(() => {
+    if (isSuperUser) {
+      return activeRound ?? rounds[0] ?? null;
+    }
+
+    return activeRound;
+  }, [activeRound, isSuperUser, rounds]);
 
   const swimmerByNumber = useMemo(() => {
     const map = new Map<number, SwimmerOption>();
@@ -122,10 +131,10 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
 
   useEffect(() => {
     if (roundId) return;
-    if (!activeRound) return;
+    if (!defaultRound) return;
 
-    setRoundId(activeRound.id);
-  }, [activeRound, roundId]);
+    setRoundId(defaultRound.id);
+  }, [defaultRound, roundId]);
 
   useEffect(() => {
     if (!roundId || !laneId) {
@@ -190,7 +199,7 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
   function handleRoundChange(nextRoundId: string) {
     const targetRound = rounds.find((round) => round.id === nextRoundId);
 
-    if (targetRound && !targetRound.isSelectable) {
+    if (targetRound && !(isSuperUser ? targetRound.isSelectableBySuperUser : targetRound.isSelectable)) {
       return;
     }
 
@@ -226,7 +235,11 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
           >
             <option value="">Sélectionner une tournée</option>
             {rounds.map((round) => (
-              <option key={round.id} value={round.id} disabled={!round.isSelectable}>
+              <option
+                key={round.id}
+                value={round.id}
+                disabled={!(isSuperUser ? round.isSelectableBySuperUser : round.isSelectable)}
+              >
                 {getRoundOptionLabel(round)}
               </option>
             ))}
@@ -264,6 +277,11 @@ export function NewSheetForm({ rounds, lanes, swimmers, existingSheets, action, 
       </div>
 
       {loadedMessage ? <p className="rounded border border-blue-200 bg-blue-50 p-2 text-sm text-blue-700">{loadedMessage}</p> : null}
+      {isSuperUser ? (
+        <p className="rounded border border-violet-200 bg-violet-50 p-2 text-sm text-violet-800">
+          Mode dérogatoire super utilisateur : saisie autorisée hors créneaux et après clôture, avec choix libre de la tournée.
+        </p>
+      ) : null}
       {activeRound ? (
         <p className="rounded border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-800">
           Tournée ouverte actuellement : <strong>{activeRound.label}</strong> ({activeRound.opensAtLabel} → {activeRound.closesAtLabel === "-" ? "Clôture événement" : activeRound.closesAtLabel}).

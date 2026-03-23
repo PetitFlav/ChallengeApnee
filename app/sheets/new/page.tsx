@@ -45,6 +45,7 @@ type RoundProgressOption = {
   label: string;
   status: "pending" | "active" | "closed";
   isSelectable: boolean;
+  isSelectableBySuperUser: boolean;
   opensAtLabel: string;
   closesAtLabel: string;
 };
@@ -181,9 +182,21 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
   }));
   const submittedRound = roundsWithProgress.find((candidateRound) => candidateRound.id === roundId) ?? null;
 
-  if (!submittedRound || submittedRound.status === "pending") {
+  if (!submittedRound) {
     return {
-      error: "La tournée sélectionnée n'est pas encore ouverte à la saisie.",
+      error: "La tournée sélectionnée n'existe pas pour cet événement.",
+      success: null,
+      loadedSheetId: null,
+      nextRoundId: null,
+    };
+  }
+
+  if (!user.isSuperUser && !submittedRound.isSelectable) {
+    return {
+      error:
+        submittedRound.status === "pending"
+          ? "La tournée sélectionnée n'est pas encore ouverte à la saisie."
+          : "La tournée sélectionnée n'est plus ouverte à la saisie.",
       success: null,
       loadedSheetId: null,
       nextRoundId: null,
@@ -233,7 +246,7 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
     }
 
     const lastRoundId = roundsWithProgress[roundsWithProgress.length - 1]?.id ?? null;
-    const canSaveAfterClosure = Boolean(latestChallenge.closedAt && roundId === lastRoundId);
+    const canSaveAfterClosure = user.isSuperUser || Boolean(latestChallenge.closedAt && roundId === lastRoundId);
 
     if (latestChallenge.closedAt && !canSaveAfterClosure) {
       return {
@@ -309,15 +322,17 @@ async function saveSheet(_prevState: CreateSheetState, formData: FormData): Prom
     revalidatePath("/dashboard");
 
     const activeRound = roundsWithProgress.find((candidateRound) => candidateRound.status === "active") ?? null;
-    const shouldSwitchToActiveRound = Boolean(activeRound && activeRound.id !== roundId);
+    const shouldSwitchToActiveRound = Boolean(!user.isSuperUser && activeRound && activeRound.id !== roundId);
 
     return {
       error: null,
-      success: latestChallenge.closedAt
+      success: latestChallenge.closedAt && !user.isSuperUser
         ? "Les données de la dernière tournée ont bien été enregistrées. L’événement est maintenant clôturé."
         : shouldSwitchToActiveRound
           ? "Les données de la tournée précédente ont bien été enregistrées. La saisie bascule maintenant sur la nouvelle tournée."
-          : "Feuille enregistrée avec succès.",
+          : user.isSuperUser && latestChallenge.closedAt
+            ? "Feuille enregistrée avec succès en mode dérogatoire super utilisateur."
+            : "Feuille enregistrée avec succès.",
       loadedSheetId: sheet.id,
       nextRoundId: shouldSwitchToActiveRound ? activeRound?.id ?? null : null,
     };
@@ -431,9 +446,13 @@ export default async function NewSheetPage() {
           <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
             {ARCHIVED_READ_ONLY_MESSAGE}
           </div>
-        ) : isClosed ? (
+        ) : isClosed && !user.isSuperUser ? (
           <div className="rounded border border-indigo-300 bg-indigo-50 p-3 text-sm text-indigo-800">
             {CLOSED_READ_ONLY_MESSAGE}
+          </div>
+        ) : isClosed && user.isSuperUser ? (
+          <div className="rounded border border-violet-300 bg-violet-50 p-3 text-sm text-violet-800">
+            Événement clôturé : la saisie reste autorisée uniquement en dérogation pour le super utilisateur.
           </div>
         ) : null}
         <NewSheetForm
@@ -458,7 +477,8 @@ export default async function NewSheetPage() {
             })),
           }))}
           action={saveSheet}
-          disabled={isArchived || isClosed}
+          disabled={isArchived}
+          isSuperUser={user.isSuperUser}
         />
       </div>
     );
