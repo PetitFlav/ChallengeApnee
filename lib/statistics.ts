@@ -7,6 +7,8 @@ export const MAX_STATISTICS_ROWS_PER_PAGE = 80;
 export type StatisticsRow = {
   swimmerId: string;
   number: number;
+  firstName: string;
+  lastName: string;
   fullName: string;
   club: string;
   section: string;
@@ -138,6 +140,8 @@ export async function getStatisticsPageData(challengeId: string, filters: Statis
     return {
       swimmerId: swimmer.id,
       number: swimmer.number,
+      firstName: swimmer.firstName,
+      lastName: swimmer.lastName,
       fullName: `${swimmer.firstName} ${swimmer.lastName}`,
       club: swimmer.club?.name ?? "-",
       section: swimmer.section?.name ?? "-",
@@ -155,6 +159,8 @@ export async function getStatisticsPageData(challengeId: string, filters: Statis
       const matchesQuery =
         normalizedQuery.length === 0 ||
         row.fullName.toLocaleLowerCase("fr-FR").includes(normalizedQuery) ||
+        row.firstName.toLocaleLowerCase("fr-FR").includes(normalizedQuery) ||
+        row.lastName.toLocaleLowerCase("fr-FR").includes(normalizedQuery) ||
         row.club.toLocaleLowerCase("fr-FR").includes(normalizedQuery) ||
         row.section.toLocaleLowerCase("fr-FR").includes(normalizedQuery) ||
         String(row.number).includes(normalizedQuery);

@@ -11,6 +11,8 @@ import { StatisticsPrintControls } from "./statistics-print-controls";
 
 export const dynamic = "force-dynamic";
 
+const TOP_TEN_SIZE = 10;
+
 const databaseUrl = process.env.DATABASE_URL;
 const hasDatabaseUrl = (() => {
   if (!databaseUrl) return false;
@@ -74,6 +76,14 @@ export default async function StatisticsPage({
       rowsPerPage,
     });
 
+    const topSwimmers = swimmerStats
+      .slice()
+      .sort((a, b) => {
+        if (b.totalDistanceM !== a.totalDistanceM) return b.totalDistanceM - a.totalDistanceM;
+        return a.number - b.number;
+      })
+      .slice(0, TOP_TEN_SIZE);
+
     const hasActiveFilters = Boolean(query || clubId || sectionId);
     const printParams = new URLSearchParams();
     if (query) printParams.set("q", query);
@@ -81,6 +91,7 @@ export default async function StatisticsPage({
     if (sectionId) printParams.set("sectionId", sectionId);
     printParams.set("rowsPerPage", String(rowsPerPage));
     const printHref = `/statistics/print?${printParams.toString()}`;
+    const top10PrintHref = `/statistics/print?${new URLSearchParams({ ...Object.fromEntries(printParams.entries()), view: "top10" }).toString()}`;
 
     return (
       <div className="space-y-6">
@@ -101,7 +112,7 @@ export default async function StatisticsPage({
                 Choisissez vos filtres, le nombre de nageurs par page, puis ouvrez la vue dédiée d&apos;impression.
               </p>
             </div>
-            <StatisticsPrintControls href={printHref} />
+            <StatisticsPrintControls href={printHref} label="Imprimer la statistique" />
           </div>
 
           <form method="get" className="mt-4 grid gap-3 md:grid-cols-4">
@@ -232,6 +243,53 @@ export default async function StatisticsPage({
           </div>
 
           {swimmerStats.length === 0 ? <p className="mt-3 text-sm text-slate-500">Aucun nageur ne correspond aux filtres.</p> : null}
+        </section>
+
+        <section className="rounded border bg-white p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900">Top 10</h2>
+              <p className="text-sm text-slate-600">
+                Classement calculé directement à partir des nageurs déjà filtrés dans la statistique générale.
+              </p>
+            </div>
+            <StatisticsPrintControls href={top10PrintHref} label="Imprimer le Top 10" />
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="p-2 text-left">Rang</th>
+                  <th className="p-2 text-left">Nom</th>
+                  <th className="p-2 text-left">Prénom</th>
+                  <th className="p-2 text-left">N° nageur</th>
+                  <th className="p-2 text-left">Club</th>
+                  <th className="p-2 text-left">Section</th>
+                  <th className="p-2 text-right">Distance 25 m</th>
+                  <th className="p-2 text-right">Distance 50 m</th>
+                  <th className="p-2 text-right">Distance totale</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {topSwimmers.map((row, index) => (
+                  <tr key={`top10-${row.swimmerId}`}>
+                    <td className="p-2 font-semibold text-slate-900">{index + 1}</td>
+                    <td className="p-2">{row.lastName}</td>
+                    <td className="p-2">{row.firstName}</td>
+                    <td className="p-2">{row.number}</td>
+                    <td className="p-2">{row.club}</td>
+                    <td className="p-2">{row.section}</td>
+                    <td className="p-2 text-right">{row.totalDistance25M.toLocaleString("fr-FR")} m</td>
+                    <td className="p-2 text-right">{row.totalDistance50M.toLocaleString("fr-FR")} m</td>
+                    <td className="p-2 text-right font-semibold text-blue-700">{row.totalDistanceM.toLocaleString("fr-FR")} m</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {topSwimmers.length === 0 ? <p className="mt-3 text-sm text-slate-500">Aucun nageur ne correspond aux filtres pour le Top 10.</p> : null}
         </section>
       </div>
     );
