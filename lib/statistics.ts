@@ -162,10 +162,7 @@ export async function getStatisticsPageData(challengeId: string, filters: Statis
 
       return matchesQuery && matchesClub && matchesSection;
     })
-    .sort((a, b) => {
-      if (b.totalDistanceM !== a.totalDistanceM) return b.totalDistanceM - a.totalDistanceM;
-      return a.number - b.number;
-    });
+    .sort((a, b) => a.number - b.number);
 
   return {
     swimmerStats,

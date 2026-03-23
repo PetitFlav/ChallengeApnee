@@ -197,7 +197,7 @@ export default async function StatisticsPage({
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-semibold text-slate-900">Tableau statistique nageurs</h2>
-              <p className="text-sm text-slate-600">Trié par distance totale décroissante, puis par numéro nageur.</p>
+              <p className="text-sm text-slate-600">Trié par numéro de nageur en ordre croissant.</p>
             </div>
             <p className="text-sm text-slate-600">Total général de comparaison : {generalTotalDistanceM.toLocaleString("fr-FR")} m</p>
           </div>

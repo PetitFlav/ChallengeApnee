@@ -4,15 +4,23 @@ type PrintButtonProps = {
   currentPages?: number;
   extraPages?: number;
   searchParams?: string;
+  extraPagesLabel?: string;
+  currentPagesLabel?: string;
 };
 
-export function PrintButton({ currentPages, extraPages = 0, searchParams = "" }: PrintButtonProps) {
+export function PrintButton({
+  currentPages,
+  extraPages = 0,
+  searchParams = "",
+  extraPagesLabel = "Pages supplémentaires",
+  currentPagesLabel = "Pages actuelles",
+}: PrintButtonProps) {
   const showPaginationControls = typeof currentPages === "number";
   const preservedSearchParams = Array.from(new URLSearchParams(searchParams).entries());
 
   return (
     <div className="flex items-end gap-3">
-      {showPaginationControls ? <p className="text-sm font-medium text-slate-700">Pages actuelles : {currentPages}</p> : null}
+      {showPaginationControls ? <p className="text-sm font-medium text-slate-700">{currentPagesLabel} : {currentPages}</p> : null}
 
       {showPaginationControls ? (
         <form method="get" className="flex items-end gap-2">
@@ -20,7 +28,7 @@ export function PrintButton({ currentPages, extraPages = 0, searchParams = "" }:
             <input key={`${name}-${value}`} type="hidden" name={name} value={value} />
           ))}
           <label htmlFor="extraPages" className="text-sm font-medium text-slate-700">
-            Pages supplémentaires
+            {extraPagesLabel}
           </label>
           <input
             id="extraPages"

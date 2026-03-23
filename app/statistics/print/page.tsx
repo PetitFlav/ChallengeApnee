@@ -98,7 +98,7 @@ export default async function StatisticsPrintPage({
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="text-2xl font-bold text-slate-900">{challenge.name}</p>
-                    <p className="text-sm text-slate-600">Statistique nageurs — impression filtrée</p>
+                    <p className="text-sm text-slate-600">Statistique nageurs — impression filtrée, tri par numéro croissant</p>
                   </div>
                   <div className="text-right text-sm text-slate-600">
                     <p>Imprimé le {printedAt}</p>
