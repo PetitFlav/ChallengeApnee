@@ -7,6 +7,12 @@ import { prisma } from "@/lib/prisma";
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import { SwimmerCreateForm } from "./swimmer-create-form";
 
+function buildSwimmersPrintHref(query: string) {
+  const params = new URLSearchParams();
+  if (query) params.set("q", query);
+  return `/swimmers/print${params.size > 0 ? `?${params.toString()}` : ""}`;
+}
+
 export const dynamic = "force-dynamic";
 const databaseUrl = process.env.DATABASE_URL;
 const hasDatabaseUrl = (() => {
@@ -458,6 +464,14 @@ export default async function SwimmersPage({
               className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
             >
               Voir Statistique
+            </a>
+            <a
+              href={buildSwimmersPrintHref(query)}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              Imprimer tableau nageur
             </a>
             <form className="flex gap-2" method="get">
             <input

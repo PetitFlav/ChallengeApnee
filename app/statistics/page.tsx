@@ -1,7 +1,12 @@
 import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import { requireChallengeForModule, requireModuleAccess } from "@/lib/access";
 import { requireSessionUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import {
+  MAX_STATISTICS_ROWS_PER_PAGE,
+  MIN_STATISTICS_ROWS_PER_PAGE,
+  getStatisticsPageData,
+  parseStatisticsRowsPerPage,
+} from "@/lib/statistics";
 import { StatisticsPrintControls } from "./statistics-print-controls";
 
 export const dynamic = "force-dynamic";
@@ -17,45 +22,12 @@ const hasDatabaseUrl = (() => {
   }
 })();
 
-const DEFAULT_ROWS_PER_PAGE = 20;
-const MIN_ROWS_PER_PAGE = 8;
-const MAX_ROWS_PER_PAGE = 80;
-
 type StatisticsSearchParams = {
   q?: string;
   clubId?: string;
   sectionId?: string;
   rowsPerPage?: string;
 };
-
-type StatisticsRow = {
-  swimmerId: string;
-  number: number;
-  fullName: string;
-  club: string;
-  section: string;
-  totalDistanceM: number;
-  totalDistance25M: number;
-  totalDistance50M: number;
-};
-
-function parseRowsPerPage(value: string | undefined) {
-  const parsed = Number(value);
-
-  if (!Number.isInteger(parsed)) return DEFAULT_ROWS_PER_PAGE;
-
-  return Math.min(Math.max(parsed, MIN_ROWS_PER_PAGE), MAX_ROWS_PER_PAGE);
-}
-
-function chunkRows<T>(rows: T[], chunkSize: number) {
-  const chunks: T[][] = [];
-
-  for (let index = 0; index < rows.length; index += chunkSize) {
-    chunks.push(rows.slice(index, index + chunkSize));
-  }
-
-  return chunks;
-}
 
 export default async function StatisticsPage({
   searchParams,
@@ -83,154 +55,35 @@ export default async function StatisticsPage({
     const query = searchParams?.q?.trim() ?? "";
     const clubId = searchParams?.clubId?.trim() ?? "";
     const sectionId = searchParams?.sectionId?.trim() ?? "";
-    const rowsPerPage = parseRowsPerPage(searchParams?.rowsPerPage);
+    const rowsPerPage = parseStatisticsRowsPerPage(searchParams?.rowsPerPage);
 
-    const [swimmers, finalResults, sheetEntries, challengeClubs, sections] = await Promise.all([
-      prisma.swimmer.findMany({
-        where: { challengeId: challenge.id },
-        include: { club: true, section: true },
-        orderBy: [{ number: "asc" }],
-      }),
-      prisma.finalResult.findMany({
-        where: { challengeId: challenge.id },
-        select: {
-          roundId: true,
-          laneId: true,
-          swimmerId: true,
-          distanceM: true,
-          lane: { select: { distanceM: true } },
-        },
-      }),
-      prisma.sheetEntry.findMany({
-        where: { sheet: { challengeId: challenge.id } },
-        select: {
-          swimmerId: true,
-          distanceM: true,
-          sheet: {
-            select: {
-              roundId: true,
-              laneId: true,
-              lane: { select: { distanceM: true } },
-            },
-          },
-        },
-      }),
-      prisma.challengeClub.findMany({
-        where: { challengeId: challenge.id },
-        include: { club: true },
-        orderBy: { club: { name: "asc" } },
-      }),
-      prisma.section.findMany({ orderBy: { name: "asc" } }),
-    ]);
-
-    const distanceByKey = new Map<string, { swimmerId: string; laneDistanceM: number; distanceM: number }>();
-
-    for (const entry of sheetEntries) {
-      distanceByKey.set(`${entry.sheet.roundId}-${entry.sheet.laneId}-${entry.swimmerId}`, {
-        swimmerId: entry.swimmerId,
-        laneDistanceM: entry.sheet.lane.distanceM,
-        distanceM: entry.distanceM,
-      });
-    }
-
-    for (const result of finalResults) {
-      distanceByKey.set(`${result.roundId}-${result.laneId}-${result.swimmerId}`, {
-        swimmerId: result.swimmerId,
-        laneDistanceM: result.lane.distanceM,
-        distanceM: result.distanceM,
-      });
-    }
-
-    const totalsBySwimmerId = new Map<string, { totalDistanceM: number; totalDistance25M: number; totalDistance50M: number }>();
-
-    for (const line of distanceByKey.values()) {
-      const current = totalsBySwimmerId.get(line.swimmerId) ?? {
-        totalDistanceM: 0,
-        totalDistance25M: 0,
-        totalDistance50M: 0,
-      };
-
-      current.totalDistanceM += line.distanceM;
-      if (line.laneDistanceM === 25) current.totalDistance25M += line.distanceM;
-      if (line.laneDistanceM === 50) current.totalDistance50M += line.distanceM;
-      totalsBySwimmerId.set(line.swimmerId, current);
-    }
-
-    const swimmersById = new Map(swimmers.map((swimmer) => [swimmer.id, swimmer]));
-    const normalizedQuery = query.toLocaleLowerCase("fr-FR");
-
-    const allRows: StatisticsRow[] = swimmers.map((swimmer) => {
-      const totals = totalsBySwimmerId.get(swimmer.id) ?? {
-        totalDistanceM: 0,
-        totalDistance25M: 0,
-        totalDistance50M: 0,
-      };
-
-      return {
-        swimmerId: swimmer.id,
-        number: swimmer.number,
-        fullName: `${swimmer.firstName} ${swimmer.lastName}`,
-        club: swimmer.club?.name ?? "-",
-        section: swimmer.section?.name ?? "-",
-        ...totals,
-      };
+    const {
+      swimmerStats,
+      filteredTotalDistanceM,
+      filteredTotalDistance25M,
+      filteredTotalDistance50M,
+      generalTotalDistanceM,
+      generalTotalDistance25M,
+      generalTotalDistance50M,
+      challengeClubs,
+      sections,
+    } = await getStatisticsPageData(challenge.id, {
+      query,
+      clubId,
+      sectionId,
+      rowsPerPage,
     });
 
-    const swimmerStats = allRows
-      .filter((row) => {
-        const swimmer = swimmersById.get(row.swimmerId);
-        if (!swimmer) return false;
-
-        const matchesQuery =
-          normalizedQuery.length === 0 ||
-          row.fullName.toLocaleLowerCase("fr-FR").includes(normalizedQuery) ||
-          row.club.toLocaleLowerCase("fr-FR").includes(normalizedQuery) ||
-          row.section.toLocaleLowerCase("fr-FR").includes(normalizedQuery) ||
-          String(row.number).includes(normalizedQuery);
-
-        const matchesClub = !clubId || swimmer.clubId === clubId;
-        const matchesSection = !sectionId || swimmer.sectionId === sectionId;
-
-        return matchesQuery && matchesClub && matchesSection;
-      })
-      .sort((a, b) => {
-        if (b.totalDistanceM !== a.totalDistanceM) return b.totalDistanceM - a.totalDistanceM;
-        return a.number - b.number;
-      });
-
-    const filteredTotalDistanceM = swimmerStats.reduce((sum, row) => sum + row.totalDistanceM, 0);
-    const filteredTotalDistance25M = swimmerStats.reduce((sum, row) => sum + row.totalDistance25M, 0);
-    const filteredTotalDistance50M = swimmerStats.reduce((sum, row) => sum + row.totalDistance50M, 0);
-
-    const generalTotalDistanceM = allRows.reduce((sum, row) => sum + row.totalDistanceM, 0);
-    const generalTotalDistance25M = allRows.reduce((sum, row) => sum + row.totalDistance25M, 0);
-    const generalTotalDistance50M = allRows.reduce((sum, row) => sum + row.totalDistance50M, 0);
-
-    const pages = chunkRows(swimmerStats, rowsPerPage);
-    const printedAt = new Intl.DateTimeFormat("fr-FR", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(new Date());
     const hasActiveFilters = Boolean(query || clubId || sectionId);
+    const printParams = new URLSearchParams();
+    if (query) printParams.set("q", query);
+    if (clubId) printParams.set("clubId", clubId);
+    if (sectionId) printParams.set("sectionId", sectionId);
+    printParams.set("rowsPerPage", String(rowsPerPage));
+    const printHref = `/statistics/print?${printParams.toString()}`;
 
     return (
       <div className="space-y-6">
-        <style>{`
-          @media print {
-            .statistics-screen-controls {
-              display: none;
-            }
-
-            .statistics-print-page {
-              break-after: page;
-            }
-
-            .statistics-print-page:last-child {
-              break-after: auto;
-            }
-          }
-        `}</style>
-
         <BackToMainMenuLink />
 
         <div>
@@ -245,10 +98,10 @@ export default async function StatisticsPage({
             <div>
               <h2 className="text-xl font-semibold text-slate-900">Filtres et impression</h2>
               <p className="text-sm text-slate-600">
-                Choisissez vos filtres, le nombre de nageurs par page, puis imprimez la statistique filtrée.
+                Choisissez vos filtres, le nombre de nageurs par page, puis ouvrez la vue dédiée d&apos;impression.
               </p>
             </div>
-            <StatisticsPrintControls />
+            <StatisticsPrintControls href={printHref} />
           </div>
 
           <form method="get" className="mt-4 grid gap-3 md:grid-cols-4">
@@ -292,8 +145,8 @@ export default async function StatisticsPage({
               <input
                 type="number"
                 name="rowsPerPage"
-                min={MIN_ROWS_PER_PAGE}
-                max={MAX_ROWS_PER_PAGE}
+                min={MIN_STATISTICS_ROWS_PER_PAGE}
+                max={MAX_STATISTICS_ROWS_PER_PAGE}
                 defaultValue={rowsPerPage}
                 className="w-full rounded border border-slate-300 px-3 py-2"
               />
@@ -379,68 +232,6 @@ export default async function StatisticsPage({
           </div>
 
           {swimmerStats.length === 0 ? <p className="mt-3 text-sm text-slate-500">Aucun nageur ne correspond aux filtres.</p> : null}
-        </section>
-
-        <section className="space-y-4 print:space-y-0">
-          {pages.length === 0 ? (
-            <article className="statistics-print-page rounded border bg-white p-4">
-              <h2 className="text-xl font-semibold text-slate-900">Impression statistique</h2>
-              <p className="mt-2 text-sm text-slate-600">Aucune donnée à imprimer avec les filtres actuels.</p>
-            </article>
-          ) : (
-            pages.map((pageRows, pageIndex) => (
-              <article
-                key={`statistics-page-${pageIndex + 1}`}
-                className="statistics-print-page rounded border bg-white p-4 print:rounded-none print:border-none"
-              >
-                <header className="mb-4 border-b border-slate-200 pb-3">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-2xl font-bold text-slate-900">{challenge.name}</p>
-                      <p className="text-sm text-slate-600">Statistique nageurs — impression filtrée</p>
-                    </div>
-                    <div className="text-right text-sm text-slate-600">
-                      <p>Imprimé le {printedAt}</p>
-                      <p>Page {pageIndex + 1} / {pages.length}</p>
-                    </div>
-                  </div>
-                  <div className="mt-3 grid gap-2 text-sm text-slate-700 md:grid-cols-2 xl:grid-cols-4">
-                    <p>Total filtré : <span className="font-semibold">{filteredTotalDistanceM.toLocaleString("fr-FR")} m</span></p>
-                    <p>Total général : <span className="font-semibold">{generalTotalDistanceM.toLocaleString("fr-FR")} m</span></p>
-                    <p>Total filtré 25 m : <span className="font-semibold">{filteredTotalDistance25M.toLocaleString("fr-FR")} m</span></p>
-                    <p>Total filtré 50 m : <span className="font-semibold">{filteredTotalDistance50M.toLocaleString("fr-FR")} m</span></p>
-                  </div>
-                </header>
-
-                <table className="min-w-full border-collapse text-sm">
-                  <thead>
-                    <tr>
-                      <th className="border border-slate-300 p-2 text-left">#</th>
-                      <th className="border border-slate-300 p-2 text-left">Nageur</th>
-                      <th className="border border-slate-300 p-2 text-left">Club</th>
-                      <th className="border border-slate-300 p-2 text-left">Section</th>
-                      <th className="border border-slate-300 p-2 text-right">25 m</th>
-                      <th className="border border-slate-300 p-2 text-right">50 m</th>
-                      <th className="border border-slate-300 p-2 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pageRows.map((row) => (
-                      <tr key={`print-row-${row.swimmerId}`}>
-                        <td className="border border-slate-300 p-2">{row.number}</td>
-                        <td className="border border-slate-300 p-2">{row.fullName}</td>
-                        <td className="border border-slate-300 p-2">{row.club}</td>
-                        <td className="border border-slate-300 p-2">{row.section}</td>
-                        <td className="border border-slate-300 p-2 text-right">{row.totalDistance25M.toLocaleString("fr-FR")} m</td>
-                        <td className="border border-slate-300 p-2 text-right">{row.totalDistance50M.toLocaleString("fr-FR")} m</td>
-                        <td className="border border-slate-300 p-2 text-right font-semibold">{row.totalDistanceM.toLocaleString("fr-FR")} m</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </article>
-            ))
-          )}
         </section>
       </div>
     );
