@@ -10,8 +10,6 @@ import {
   type DashboardSwimmerStatus,
 } from "@/lib/verification";
 import { VerificationDashboard } from "./verification-dashboard";
-import { getChallengeStatisticsData } from "@/lib/statistics";
-import { StatisticsPanel } from "./statistics-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -225,28 +223,6 @@ export default async function DashboardPage() {
 
       revalidatePath("/dashboard");
     }
-
-    const statisticsData = await getChallengeStatisticsData(challenge.id);
-
-    if (!statisticsData) {
-      throw new Error(`Challenge introuvable pour le dashboard: ${challenge.id}`);
-    }
-
-    const swimmerStatistics = statisticsData.rows.map((row) => ({
-      swimmerId: row.swimmerId,
-      number: row.swimmerNumber,
-      firstName: row.firstName,
-      lastName: row.lastName,
-      club: row.club === "-" ? "" : row.club,
-      section: row.section === "-" ? "" : row.section,
-      total25M: row.distance25M,
-      total50M: row.distance50M,
-      totalDistanceM: row.totalDistanceM,
-    }));
-
-    const totalEvent25M = swimmerStatistics.reduce((sum, row) => sum + row.total25M, 0);
-    const totalEvent50M = swimmerStatistics.reduce((sum, row) => sum + row.total50M, 0);
-    const totalEventDistanceM = swimmerStatistics.reduce((sum, row) => sum + row.totalDistanceM, 0);
 
     const [sheetEntries, rounds, finalResults] = await Promise.all([
       prisma.sheetEntry.findMany({
@@ -543,17 +519,6 @@ export default async function DashboardPage() {
             {challenge.roundsCount} tournées · {challenge.lanes25Count} lignes 25m · {challenge.lanes50Count} lignes 50m
           </p>
         </section>
-
-        <StatisticsPanel
-          challengeName={challenge.name}
-          challengeDateLabel={challenge.eventDate.toLocaleDateString("fr-FR")}
-          clubOrganisateur={challenge.clubOrganisateur}
-          clubOrganisateurLogo={challenge.clubOrganisateurLogo}
-          rows={swimmerStatistics}
-          totalEvent25M={totalEvent25M}
-          totalEvent50M={totalEvent50M}
-          totalEventDistanceM={totalEventDistanceM}
-        />
 
         <VerificationDashboard
           rounds={verificationRounds}
