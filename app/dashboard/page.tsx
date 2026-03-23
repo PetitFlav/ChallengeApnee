@@ -10,34 +10,13 @@ import {
   type DashboardSwimmerStatus,
 } from "@/lib/verification";
 import { VerificationDashboard } from "./verification-dashboard";
+import { getChallengeStatisticsData } from "@/lib/statistics";
 import { StatisticsPanel } from "./statistics-panel";
 
 export const dynamic = "force-dynamic";
 
-const databaseUrl = process.env.DATABASE_URL;
-const hasDatabaseUrl = (() => {
-  if (!databaseUrl) return false;
-  try {
-    new URL(databaseUrl);
-    return true;
-  } catch {
-    return false;
-  }
-})();
-
 export default async function DashboardPage() {
   const user = await requireSessionUser();
-  if (!hasDatabaseUrl) {
-    return (
-      <div className="space-y-4">
-        <BackToMainMenuLink />
-        <h1 className="text-3xl font-semibold">Dashboard</h1>
-        <div className="rounded border border-amber-300 bg-amber-50 p-4 text-amber-800">
-          Définissez la variable DATABASE_URL pour activer le dashboard.
-        </div>
-      </div>
-    );
-  }
 
   try {
     await requireModuleAccess(user, "dashboard");
@@ -246,6 +225,28 @@ export default async function DashboardPage() {
 
       revalidatePath("/dashboard");
     }
+
+    const statisticsData = await getChallengeStatisticsData(challenge.id);
+
+    if (!statisticsData) {
+      throw new Error(`Challenge introuvable pour le dashboard: ${challenge.id}`);
+    }
+
+    const swimmerStatistics = statisticsData.rows.map((row) => ({
+      swimmerId: row.swimmerId,
+      number: row.swimmerNumber,
+      firstName: row.firstName,
+      lastName: row.lastName,
+      club: row.club === "-" ? "" : row.club,
+      section: row.section === "-" ? "" : row.section,
+      total25M: row.distance25M,
+      total50M: row.distance50M,
+      totalDistanceM: row.totalDistanceM,
+    }));
+
+    const totalEvent25M = swimmerStatistics.reduce((sum, row) => sum + row.total25M, 0);
+    const totalEvent50M = swimmerStatistics.reduce((sum, row) => sum + row.total50M, 0);
+    const totalEventDistanceM = swimmerStatistics.reduce((sum, row) => sum + row.totalDistanceM, 0);
 
     const [sheetEntries, rounds, finalResults] = await Promise.all([
       prisma.sheetEntry.findMany({
@@ -568,14 +569,19 @@ export default async function DashboardPage() {
         />
       </div>
     );
-  } catch {
+  } catch (error) {
+    console.error("[dashboard] load failed", error);
+
     return (
       <div className="space-y-4">
         <BackToMainMenuLink />
         <h1 className="text-3xl font-semibold">Dashboard</h1>
         <div className="rounded border border-amber-300 bg-amber-50 p-4 text-amber-800">
-          Impossible de se connecter à la base de données. Vérifiez DATABASE_URL.
+          Erreur de chargement du dashboard
         </div>
+        {error instanceof Error && error.message ? (
+          <div className="rounded border border-slate-300 bg-slate-50 p-4 text-slate-700">{error.message}</div>
+        ) : null}
       </div>
     );
   }
