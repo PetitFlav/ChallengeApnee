@@ -28,6 +28,51 @@ function parseSwimmersPerPrintPage(value: string | undefined) {
   return Math.min(Math.max(parsed, MIN_SWIMMERS_PER_PRINT_PAGE), MAX_SWIMMERS_PER_PRINT_PAGE);
 }
 
+type PrintableRow = {
+  key: string;
+  number: number | null;
+  firstName: string;
+  lastName: string;
+  clubName: string;
+};
+
+function buildPrintablePages(
+  swimmers: Array<{
+    id: string;
+    number: number;
+    firstName: string;
+    lastName: string;
+    club: { name: string } | null;
+  }>,
+  swimmersPerPage: number,
+  extraPages: number,
+) {
+  const minimumPageCount = Math.max(Math.ceil(swimmers.length / swimmersPerPage), 1);
+  const totalPageCount = minimumPageCount + extraPages;
+  const printableRows: PrintableRow[] = swimmers.map((swimmer) => ({
+    key: swimmer.id,
+    number: swimmer.number,
+    firstName: swimmer.firstName,
+    lastName: swimmer.lastName,
+    clubName: swimmer.club?.name ?? "-",
+  }));
+
+  const highestAssignedNumber = swimmers.reduce((maxNumber, swimmer) => Math.max(maxNumber, swimmer.number), 0);
+  const targetRowCount = totalPageCount * swimmersPerPage;
+
+  for (let rowIndex = printableRows.length; rowIndex < targetRowCount; rowIndex += 1) {
+    printableRows.push({
+      key: `blank-row-${rowIndex + 1}`,
+      number: highestAssignedNumber + (rowIndex - swimmers.length) + 1,
+      firstName: "",
+      lastName: "",
+      clubName: "",
+    });
+  }
+
+  return chunkRows(printableRows, swimmersPerPage);
+}
+
 export default async function SwimmersPrintPage({
   searchParams,
 }: {
@@ -63,8 +108,7 @@ export default async function SwimmersPrintPage({
   });
 
   const swimmerPages = chunkRows(swimmers, swimmersPerPage);
-  const blankPages = Array.from({ length: extraPages }, () => [] as typeof swimmers);
-  const pages = [...(swimmerPages.length > 0 ? swimmerPages : [[]]), ...blankPages];
+  const pages = buildPrintablePages(swimmers, swimmersPerPage, extraPages);
   const printQuery = new URLSearchParams();
   if (query) printQuery.set("q", query);
   printQuery.set("swimmersPerPage", String(swimmersPerPage));
@@ -149,7 +193,7 @@ export default async function SwimmersPrintPage({
                 <p className="text-sm text-slate-600">Tableau nageurs — page {pageIndex + 1}</p>
               </div>
               <div className="text-right text-sm text-slate-600">
-                <p>Nageurs affichés : {pageRows.length}</p>
+                <p>Nageurs affichés : {pageRows.filter((row) => row.firstName || row.lastName || row.clubName).length}</p>
                 <p>Pagination : {swimmersPerPage} nageur(s) / page</p>
                 <p>Page {pageIndex + 1} / {pages.length}</p>
               </div>
@@ -165,23 +209,14 @@ export default async function SwimmersPrintPage({
                 </tr>
               </thead>
               <tbody>
-                {pageRows.length > 0
-                  ? pageRows.map((swimmer) => (
-                      <tr key={swimmer.id}>
-                        <td className="border border-slate-300 p-2">{swimmer.number}</td>
-                        <td className="border border-slate-300 p-2">{swimmer.firstName}</td>
-                        <td className="border border-slate-300 p-2">{swimmer.lastName}</td>
-                        <td className="border border-slate-300 p-2">{swimmer.club?.name ?? "-"}</td>
-                      </tr>
-                    ))
-                  : Array.from({ length: swimmersPerPage }, (_, rowIndex) => (
-                      <tr key={`blank-row-${pageIndex + 1}-${rowIndex + 1}`}>
-                        <td className="border border-slate-300 p-2">&nbsp;</td>
-                        <td className="border border-slate-300 p-2">&nbsp;</td>
-                        <td className="border border-slate-300 p-2">&nbsp;</td>
-                        <td className="border border-slate-300 p-2">&nbsp;</td>
-                      </tr>
-                    ))}
+                {pageRows.map((row) => (
+                  <tr key={row.key}>
+                    <td className="border border-slate-300 p-2">{row.number ?? " "}</td>
+                    <td className="border border-slate-300 p-2">{row.firstName || " "}</td>
+                    <td className="border border-slate-300 p-2">{row.lastName || " "}</td>
+                    <td className="border border-slate-300 p-2">{row.clubName || " "}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </section>

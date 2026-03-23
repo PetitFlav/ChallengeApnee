@@ -147,6 +147,8 @@ export async function getStatisticsPageData(challengeId: string, filters: Statis
 
   const swimmerStats = allRows
     .filter((row) => {
+      if (row.totalDistanceM <= 0) return false;
+
       const swimmer = swimmersById.get(row.swimmerId);
       if (!swimmer) return false;
 
