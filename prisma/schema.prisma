@@ -9,46 +9,46 @@ datasource db {
 }
 
 model Challenge {
-  id              String          @id @default(cuid())
-  name            String
-  eventDate       DateTime
-  durationMinutes Int             @default(120)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  startTime       String?
-  timezone        String          @default("Europe/Paris")
-  endTime         String?
-  roundsCount     Int             @default(4)
-  lanes25Count    Int             @default(4)
-  lanes50Count    Int             @default(6)
-  clubOrganisateur String         @default("")
+  id                   String          @id @default(cuid())
+  name                 String
+  eventDate            DateTime
+  durationMinutes      Int             @default(120)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  startTime            String?
+  endTime              String?
+  roundsCount          Int             @default(4)
+  lanes25Count         Int             @default(4)
+  lanes50Count         Int             @default(6)
+  isActive             Boolean         @default(false)
+  isArchived           Boolean         @default(false)
+  timezone             String          @default("Europe/Paris")
+  closedAt             DateTime?
+  clubOrganisateur     String          @default("")
   clubOrganisateurLogo String?
-  isActive        Boolean         @default(false)
-  isArchived      Boolean         @default(false)
-  closedAt        DateTime?
-  clubLinks       ChallengeClub[]
-  lanes           Lane[]
-  rounds          Round[]
-  sheets          Sheet[]
-  swimmers        Swimmer[]
-  userLinks       ChallengeUser[]
-  finalResults    FinalResult[]
+  clubLinks            ChallengeClub[]
+  userLinks            ChallengeUser[]
+  finalResults         FinalResult[]
+  lanes                Lane[]
+  rounds               Round[]
+  sheets               Sheet[]
+  swimmers             Swimmer[]
 
   @@map("challenges")
 }
 
 model User {
-  id           String          @id @default(cuid())
-  firstName    String
-  lastName     String
-  email        String          @unique
-  passwordHash String
-  isSuperUser  Boolean         @default(false)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  challenges   ChallengeUser[]
-  verifications Verification[]
-  validatedFinalResults FinalResult[] @relation("FinalResultValidatedBy")
+  id                    String          @id @default(cuid())
+  firstName             String
+  lastName              String
+  email                 String          @unique
+  passwordHash          String
+  isSuperUser           Boolean         @default(false)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  challenges            ChallengeUser[]
+  validatedFinalResults FinalResult[]   @relation("FinalResultValidatedBy")
+  verifications         Verification[]
 
   @@map("users")
 }
@@ -58,9 +58,8 @@ model ChallengeUser {
   userId      String
   challengeId String
   createdAt   DateTime  @default(now())
-
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, challengeId])
   @@index([userId])
@@ -69,13 +68,13 @@ model ChallengeUser {
 }
 
 model Club {
-  id         String          @id @default(cuid())
-  name       String          @unique
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
-  challenges ChallengeClub[]
-  swimmers   Swimmer[]
+  id           String          @id @default(cuid())
+  name         String          @unique
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  challenges   ChallengeClub[]
   finalResults FinalResult[]
+  swimmers     Swimmer[]
 
   @@map("clubs")
 }
@@ -85,7 +84,6 @@ model ChallengeClub {
   challengeId String
   clubId      String
   createdAt   DateTime  @default(now())
-
   challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   club        Club      @relation(fields: [clubId], references: [id], onDelete: Cascade)
 
@@ -96,33 +94,33 @@ model ChallengeClub {
 }
 
 model Section {
-  id        String    @id @default(cuid())
-  name      String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  swimmers  Swimmer[]
+  id           String        @id @default(cuid())
+  name         String        @unique
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   finalResults FinalResult[]
+  swimmers     Swimmer[]
 
   @@map("sections")
 }
 
 model Swimmer {
-  id          String       @id @default(cuid())
-  challengeId String
-  number      Int
-  firstName   String
-  lastName    String
-  email       String
-  clubId      String?
-  sectionId   String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  entries     SheetEntry[]
+  id                String             @id @default(cuid())
+  challengeId       String
+  number            Int
+  firstName         String
+  lastName          String
+  email             String
+  clubId            String?
+  sectionId         String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  finalResults      FinalResult[]
+  entries           SheetEntry[]
+  challenge         Challenge          @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  club              Club?              @relation(fields: [clubId], references: [id])
+  section           Section?           @relation(fields: [sectionId], references: [id])
   verificationLines VerificationLine[]
-  finalResults FinalResult[]
-  challenge   Challenge    @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  club        Club?        @relation(fields: [clubId], references: [id])
-  section     Section?     @relation(fields: [sectionId], references: [id])
 
   @@unique([challengeId, number])
   @@index([challengeId, number])
@@ -134,17 +132,17 @@ model Swimmer {
 }
 
 model Lane {
-  id           String    @id @default(cuid())
+  id           String        @id @default(cuid())
   challengeId  String
   code         String
   distanceM    Int
   displayOrder Int
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  challenge    Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  sheets       Sheet[]
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   finalResults FinalResult[]
+  challenge    Challenge     @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  sheets       Sheet[]
 
   @@unique([challengeId, code])
   @@index([challengeId, displayOrder])
@@ -152,17 +150,17 @@ model Lane {
 }
 
 model Round {
-  id            String    @id @default(cuid())
+  id            String        @id @default(cuid())
   challengeId   String
   roundNumber   Int
   label         String
   scheduledTime String?
   displayOrder  Int
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  challenge     Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  sheets        Sheet[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   finalResults  FinalResult[]
+  challenge     Challenge     @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  sheets        Sheet[]
 
   @@unique([challengeId, roundNumber])
   @@index([challengeId, displayOrder])
@@ -170,21 +168,21 @@ model Round {
 }
 
 model Sheet {
-  id          String       @id @default(cuid())
-  challengeId String
-  roundId     String
-  laneId      String
-  status      SheetStatus  @default(DRAFT)
-  enteredBy   String?
-  validatedAt DateTime?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  entries     SheetEntry[]
+  id            String         @id @default(cuid())
+  challengeId   String
+  roundId       String
+  laneId        String
+  status        SheetStatus    @default(DRAFT)
+  enteredBy     String?
+  validatedAt   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  finalResults  FinalResult[]
+  entries       SheetEntry[]
+  challenge     Challenge      @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  lane          Lane           @relation(fields: [laneId], references: [id])
+  round         Round          @relation(fields: [roundId], references: [id])
   verifications Verification[]
-  finalResults FinalResult[]
-  challenge   Challenge    @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  lane        Lane         @relation(fields: [laneId], references: [id])
-  round       Round        @relation(fields: [roundId], references: [id])
 
   @@unique([challengeId, roundId, laneId])
   @@index([challengeId, status])
@@ -194,33 +192,33 @@ model Sheet {
 }
 
 model Verification {
-  id        String             @id @default(cuid())
-  sheetId    String
-  userId     String
-  createdAt  DateTime          @default(now())
-  lines      VerificationLine[]
+  id           String             @id @default(cuid())
+  sheetId      String
+  userId       String
+  createdAt    DateTime           @default(now())
   finalResults FinalResult[]
-  sheet      Sheet             @relation(fields: [sheetId], references: [id], onDelete: Cascade)
-  user       User              @relation(fields: [userId], references: [id])
+  lines        VerificationLine[]
+  sheet        Sheet              @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  user         User               @relation(fields: [userId], references: [id])
 
+  @@unique([sheetId, userId])
   @@index([sheetId, createdAt])
   @@index([userId])
-  @@unique([sheetId, userId])
   @@map("verifications")
 }
 
 model VerificationLine {
-  id             String       @id @default(cuid())
+  id             String        @id @default(cuid())
   verificationId String
   swimmerId      String
   squares        Int
   ticks          Int
   totalLengths   Int
   distanceM      Int
-  createdAt      DateTime     @default(now())
-  verification   Verification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
-  swimmer        Swimmer      @relation(fields: [swimmerId], references: [id])
+  createdAt      DateTime      @default(now())
   finalResults   FinalResult[]
+  swimmer        Swimmer       @relation(fields: [swimmerId], references: [id])
+  verification   Verification  @relation(fields: [verificationId], references: [id], onDelete: Cascade)
 
   @@index([verificationId])
   @@index([swimmerId])
@@ -229,18 +227,18 @@ model VerificationLine {
 }
 
 model SheetEntry {
-  id           String   @id @default(cuid())
+  id           String        @id @default(cuid())
   sheetId      String
   swimmerId    String
   squares      Int
   ticks        Int
   totalLengths Int
   distanceM    Int
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  sheet        Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
-  swimmer      Swimmer  @relation(fields: [swimmerId], references: [id])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   finalResults FinalResult[]
+  sheet        Sheet         @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  swimmer      Swimmer       @relation(fields: [swimmerId], references: [id])
 
   @@index([sheetId])
   @@index([swimmerId])
@@ -269,17 +267,16 @@ model FinalResult {
   validatedAt              DateTime          @default(now())
   createdAt                DateTime          @default(now())
   updatedAt                DateTime          @updatedAt
-
   challenge                Challenge         @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  round                    Round             @relation(fields: [roundId], references: [id], onDelete: Cascade)
-  lane                     Lane              @relation(fields: [laneId], references: [id], onDelete: Cascade)
-  sheet                    Sheet             @relation(fields: [sheetId], references: [id], onDelete: Cascade)
-  swimmer                  Swimmer           @relation(fields: [swimmerId], references: [id], onDelete: Cascade)
   club                     Club?             @relation(fields: [clubId], references: [id])
+  lane                     Lane              @relation(fields: [laneId], references: [id], onDelete: Cascade)
+  round                    Round             @relation(fields: [roundId], references: [id], onDelete: Cascade)
   section                  Section?          @relation(fields: [sectionId], references: [id])
+  sheet                    Sheet             @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  sourceSheetEntry         SheetEntry?       @relation(fields: [sourceSheetEntryId], references: [id])
   sourceVerification       Verification?     @relation(fields: [sourceVerificationId], references: [id])
   sourceVerificationLine   VerificationLine? @relation(fields: [sourceVerificationLineId], references: [id])
-  sourceSheetEntry         SheetEntry?       @relation(fields: [sourceSheetEntryId], references: [id])
+  swimmer                  Swimmer           @relation(fields: [swimmerId], references: [id], onDelete: Cascade)
   validatedBy              User              @relation("FinalResultValidatedBy", fields: [validatedByUserId], references: [id])
 
   @@unique([challengeId, roundId, laneId, swimmerId])
