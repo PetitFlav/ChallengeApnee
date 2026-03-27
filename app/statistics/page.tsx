@@ -2,16 +2,16 @@ import { BackToMainMenuLink } from "@/app/back-to-main-menu-link";
 import { requireChallengeForModule, requireModuleAccess } from "@/lib/access";
 import { requireSessionUser } from "@/lib/auth";
 import {
+  getStatisticsPageData,
+  getTopRankedSwimmers,
   MAX_STATISTICS_ROWS_PER_PAGE,
   MIN_STATISTICS_ROWS_PER_PAGE,
-  getStatisticsPageData,
   parseStatisticsRowsPerPage,
+  TOP_RANK_LIMIT,
 } from "@/lib/statistics";
 import { StatisticsPrintControls } from "./statistics-print-controls";
 
 export const dynamic = "force-dynamic";
-
-const TOP_TEN_SIZE = 10;
 
 const databaseUrl = process.env.DATABASE_URL;
 const hasDatabaseUrl = (() => {
@@ -76,13 +76,7 @@ export default async function StatisticsPage({
       rowsPerPage,
     });
 
-    const topSwimmers = swimmerStats
-      .slice()
-      .sort((a, b) => {
-        if (b.totalDistanceM !== a.totalDistanceM) return b.totalDistanceM - a.totalDistanceM;
-        return a.number - b.number;
-      })
-      .slice(0, TOP_TEN_SIZE);
+    const topSwimmers = getTopRankedSwimmers(swimmerStats, TOP_RANK_LIMIT);
 
     const hasActiveFilters = Boolean(query || clubId || sectionId);
     const printParams = new URLSearchParams();
@@ -250,7 +244,7 @@ export default async function StatisticsPage({
             <div>
               <h2 className="text-xl font-semibold text-slate-900">Top 10</h2>
               <p className="text-sm text-slate-600">
-                Classement calculé directement à partir des nageurs déjà filtrés dans la statistique générale.
+                Classement dense calculé sur les 10 premiers rangs à partir des nageurs déjà filtrés dans la statistique générale.
               </p>
             </div>
             <StatisticsPrintControls href={top10PrintHref} label="Imprimer le Top 10" />
@@ -272,9 +266,12 @@ export default async function StatisticsPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {topSwimmers.map((row, index) => (
+                {topSwimmers.map((row) => (
                   <tr key={`top10-${row.swimmerId}`}>
-                    <td className="p-2 font-semibold text-slate-900">{index + 1}</td>
+                    <td className="p-2 font-semibold text-slate-900">
+                      <div>{row.rank}e</div>
+                      {row.isTie ? <div className="text-xs font-normal text-slate-500">ex aequo</div> : null}
+                    </td>
                     <td className="p-2">{row.lastName}</td>
                     <td className="p-2">{row.firstName}</td>
                     <td className="p-2">{row.number}</td>

@@ -37,6 +37,13 @@ export type StatisticsPageData = {
   sections: Array<{ id: string; name: string }>;
 };
 
+export type RankedStatisticsRow = StatisticsRow & {
+  rank: number;
+  isTie: boolean;
+};
+
+export const TOP_RANK_LIMIT = 10;
+
 export function parseStatisticsRowsPerPage(value: string | undefined) {
   const parsed = Number(value);
 
@@ -53,6 +60,41 @@ export function chunkRows<T>(rows: T[], chunkSize: number) {
   }
 
   return chunks;
+}
+
+export function getTopRankedSwimmers(rows: StatisticsRow[], maxRank: number): RankedStatisticsRow[] {
+  const sortedRows = rows.slice().sort((a, b) => {
+    if (b.totalDistanceM !== a.totalDistanceM) return b.totalDistanceM - a.totalDistanceM;
+    return a.number - b.number;
+  });
+
+  if (sortedRows.length === 0) return [];
+
+  const distanceCounts = new Map<number, number>();
+  for (const row of sortedRows) {
+    distanceCounts.set(row.totalDistanceM, (distanceCounts.get(row.totalDistanceM) ?? 0) + 1);
+  }
+
+  const rankedRows: RankedStatisticsRow[] = [];
+  let previousDistance: number | null = null;
+  let rank = 0;
+
+  for (const row of sortedRows) {
+    if (previousDistance === null || row.totalDistanceM !== previousDistance) {
+      rank += 1;
+      previousDistance = row.totalDistanceM;
+    }
+
+    if (rank > maxRank) break;
+
+    rankedRows.push({
+      ...row,
+      rank,
+      isTie: (distanceCounts.get(row.totalDistanceM) ?? 0) > 1,
+    });
+  }
+
+  return rankedRows;
 }
 
 export async function getStatisticsPageData(challengeId: string, filters: StatisticsPageFilters): Promise<StatisticsPageData> {
