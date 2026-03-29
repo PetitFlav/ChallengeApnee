@@ -15,6 +15,7 @@ export type DashboardVerificationStatus =
   | "Non vérifiée"
   | "Partiellement vérifiée"
   | "Vérifiée sans écart"
+  | "Vérifiée sans écart (Validé)"
   | "Vérifiée avec écarts"
   | "Vérifiée avec écarts (Validé)";
 
@@ -75,8 +76,15 @@ export function getDashboardVerificationStatus(params: {
   verifiedSheetsCount: number;
   differencesCount: number;
   unresolvedDifferencesCount?: number;
+  unresolvedConformingCount?: number;
 }): DashboardVerificationStatus {
-  const { sheetsCount, verifiedSheetsCount, differencesCount, unresolvedDifferencesCount = differencesCount } = params;
+  const {
+    sheetsCount,
+    verifiedSheetsCount,
+    differencesCount,
+    unresolvedDifferencesCount = differencesCount,
+    unresolvedConformingCount = 0,
+  } = params;
 
   if (sheetsCount === 0 || verifiedSheetsCount === 0) {
     return "Non vérifiée";
@@ -92,6 +100,10 @@ export function getDashboardVerificationStatus(params: {
     }
 
     return "Vérifiée avec écarts";
+  }
+
+  if (unresolvedConformingCount === 0) {
+    return "Vérifiée sans écart (Validé)";
   }
 
   return "Vérifiée sans écart";

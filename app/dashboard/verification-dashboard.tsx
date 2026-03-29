@@ -76,8 +76,12 @@ type RoundRow = {
 };
 
 function getVerificationStatusClassName(status: DashboardVerificationStatus) {
-  if (status === "Vérifiée avec écarts (Validé)") {
+  if (status === "Vérifiée sans écart" || status === "Vérifiée sans écart (Validé)" || status === "Vérifiée avec écarts (Validé)") {
     return "text-emerald-700 font-medium";
+  }
+
+  if (status === "Vérifiée avec écarts") {
+    return "text-amber-700 font-medium";
   }
 
   return "text-slate-900";
