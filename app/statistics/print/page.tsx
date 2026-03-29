@@ -14,6 +14,24 @@ type StatisticsPrintSearchParams = {
   view?: string;
 };
 
+function buildTop10PrintPages<T>(rows: T[], rowsPerPage: number) {
+  const pages = chunkRows(rows, rowsPerPage);
+
+  if (pages.length === 0) return [] as Array<Array<T | null>>;
+
+  return pages.map((pageRows, pageIndex) => {
+    if (pageRows.length === rowsPerPage) return pageRows;
+    if (pageIndex !== pages.length - 1) return pageRows;
+
+    const paddedRows: Array<T | null> = [...pageRows];
+    while (paddedRows.length < rowsPerPage) {
+      paddedRows.push(null);
+    }
+
+    return paddedRows;
+  });
+}
+
 export default async function StatisticsPrintPage({
   searchParams,
 }: {
@@ -46,7 +64,9 @@ export default async function StatisticsPrintPage({
   const topRankedRows = getTopRankedSwimmers(swimmerStats, TOP_RANK_LIMIT);
   const rowsToPrint = isTop10View ? topRankedRows : swimmerStats;
 
-  const pages = chunkRows(rowsToPrint, rowsPerPage);
+  const pages = isTop10View
+    ? buildTop10PrintPages(topRankedRows, rowsPerPage)
+    : chunkRows(rowsToPrint, rowsPerPage);
   const printedAt = new Intl.DateTimeFormat("fr-FR", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -158,20 +178,36 @@ export default async function StatisticsPrintPage({
                 </thead>
                 <tbody>
                   {isTop10View
-                    ? (pageRows as typeof topRankedRows).map((row) => (
-                        <tr key={`print-row-${row.swimmerId}`}>
-                          <td className="border border-slate-300 p-2">
-                            <div>{row.rank}e</div>
-                            {row.isTie ? <div className="text-xs text-slate-500">ex aequo</div> : null}
-                          </td>
-                          <td className="border border-slate-300 p-2">{row.lastName}</td>
-                          <td className="border border-slate-300 p-2">{row.firstName}</td>
-                          <td className="border border-slate-300 p-2">{row.number}</td>
-                          <td className="border border-slate-300 p-2">{row.club}</td>
-                          <td className="border border-slate-300 p-2">{row.section}</td>
-                          <td className="border border-slate-300 p-2 text-right">{row.totalDistance25M.toLocaleString("fr-FR")} m</td>
-                          <td className="border border-slate-300 p-2 text-right">{row.totalDistance50M.toLocaleString("fr-FR")} m</td>
-                          <td className="border border-slate-300 p-2 text-right font-semibold">{row.totalDistanceM.toLocaleString("fr-FR")} m</td>
+                    ? (pageRows as Array<(typeof topRankedRows)[number] | null>).map((row, rowIndex) => (
+                        <tr key={row ? `print-row-${row.swimmerId}` : `print-row-blank-${pageIndex + 1}-${rowIndex + 1}`}>
+                          {row ? (
+                            <>
+                              <td className="border border-slate-300 p-2">
+                                <div>{row.rank}e</div>
+                                {row.isTie ? <div className="text-xs text-slate-500">ex aequo</div> : null}
+                              </td>
+                              <td className="border border-slate-300 p-2">{row.lastName}</td>
+                              <td className="border border-slate-300 p-2">{row.firstName}</td>
+                              <td className="border border-slate-300 p-2">{row.number}</td>
+                              <td className="border border-slate-300 p-2">{row.club}</td>
+                              <td className="border border-slate-300 p-2">{row.section}</td>
+                              <td className="border border-slate-300 p-2 text-right">{row.totalDistance25M.toLocaleString("fr-FR")} m</td>
+                              <td className="border border-slate-300 p-2 text-right">{row.totalDistance50M.toLocaleString("fr-FR")} m</td>
+                              <td className="border border-slate-300 p-2 text-right font-semibold">{row.totalDistanceM.toLocaleString("fr-FR")} m</td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="border border-slate-300 p-2">&nbsp;</td>
+                              <td className="border border-slate-300 p-2">&nbsp;</td>
+                              <td className="border border-slate-300 p-2">&nbsp;</td>
+                              <td className="border border-slate-300 p-2">&nbsp;</td>
+                              <td className="border border-slate-300 p-2">&nbsp;</td>
+                              <td className="border border-slate-300 p-2">&nbsp;</td>
+                              <td className="border border-slate-300 p-2">&nbsp;</td>
+                              <td className="border border-slate-300 p-2">&nbsp;</td>
+                              <td className="border border-slate-300 p-2">&nbsp;</td>
+                            </>
+                          )}
                         </tr>
                       ))
                     : pageRows.map((row) => (
