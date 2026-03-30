@@ -29,6 +29,7 @@ type StatisticsSearchParams = {
   clubId?: string;
   sectionId?: string;
   rowsPerPage?: string;
+  top10RowsPerPage?: string;
 };
 
 export default async function StatisticsPage({
@@ -58,6 +59,7 @@ export default async function StatisticsPage({
     const clubId = searchParams?.clubId?.trim() ?? "";
     const sectionId = searchParams?.sectionId?.trim() ?? "";
     const rowsPerPage = parseStatisticsRowsPerPage(searchParams?.rowsPerPage);
+    const top10RowsPerPage = parseStatisticsRowsPerPage(searchParams?.top10RowsPerPage);
 
     const {
       swimmerStats,
@@ -85,7 +87,11 @@ export default async function StatisticsPage({
     if (sectionId) printParams.set("sectionId", sectionId);
     printParams.set("rowsPerPage", String(rowsPerPage));
     const printHref = `/statistics/print?${printParams.toString()}`;
-    const top10PrintHref = `/statistics/print?${new URLSearchParams({ ...Object.fromEntries(printParams.entries()), view: "top10" }).toString()}`;
+    const top10PrintHref = `/statistics/print?${new URLSearchParams({
+      ...Object.fromEntries(printParams.entries()),
+      rowsPerPage: String(top10RowsPerPage),
+      view: "top10",
+    }).toString()}`;
 
     return (
       <div className="space-y-6">
@@ -110,6 +116,7 @@ export default async function StatisticsPage({
           </div>
 
           <form method="get" className="mt-4 grid gap-3 md:grid-cols-4">
+            <input type="hidden" name="top10RowsPerPage" value={top10RowsPerPage} />
             <label className="space-y-1 text-sm text-slate-700">
               <span>Recherche</span>
               <input
@@ -247,7 +254,29 @@ export default async function StatisticsPage({
                 Classement dense calculé sur les 10 premiers rangs à partir des nageurs déjà filtrés dans la statistique générale.
               </p>
             </div>
-            <StatisticsPrintControls href={top10PrintHref} label="Imprimer le Top 10" />
+            <div className="flex flex-wrap items-end gap-3">
+              <form method="get" className="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="q" value={query} />
+                <input type="hidden" name="clubId" value={clubId} />
+                <input type="hidden" name="sectionId" value={sectionId} />
+                <input type="hidden" name="rowsPerPage" value={rowsPerPage} />
+                <label className="space-y-1 text-sm text-slate-700">
+                  <span>Nageurs par page</span>
+                  <input
+                    type="number"
+                    name="top10RowsPerPage"
+                    min={MIN_STATISTICS_ROWS_PER_PAGE}
+                    max={MAX_STATISTICS_ROWS_PER_PAGE}
+                    defaultValue={top10RowsPerPage}
+                    className="w-28 rounded border border-slate-300 px-3 py-2"
+                  />
+                </label>
+                <button type="submit" className="rounded border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700">
+                  Appliquer
+                </button>
+              </form>
+              <StatisticsPrintControls href={top10PrintHref} label="Imprimer le Top 10" />
+            </div>
           </div>
 
           <div className="overflow-x-auto">
