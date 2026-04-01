@@ -115,7 +115,7 @@ async function createSwimmer(_prevState: CreateSwimmerState, formData: FormData)
           number,
           firstName: String(formData.get("firstName") || "").trim(),
           lastName: String(formData.get("lastName") || "").trim(),
-          email: String(formData.get("email") || "").trim(),
+          email: String(formData.get("email") || "").trim() || null,
           clubId,
           sectionId,
         },
@@ -190,7 +190,7 @@ async function updateSwimmer(formData: FormData) {
     data: {
       firstName: String(formData.get("firstName") || "").trim(),
       lastName: String(formData.get("lastName") || "").trim(),
-      email: String(formData.get("email") || "").trim(),
+      email: String(formData.get("email") || "").trim() || null,
       clubId,
       sectionId: String(formData.get("sectionId") || "") || null,
     },
@@ -498,7 +498,7 @@ export default async function SwimmersPage({
               />
               <input name="firstName" defaultValue={swimmer.firstName} required disabled={isArchived} className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
               <input name="lastName" defaultValue={swimmer.lastName} required disabled={isArchived} className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
-              <input name="email" type="email" defaultValue={swimmer.email} required disabled={isArchived} className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+              <input name="email" type="email" defaultValue={swimmer.email ?? ""} disabled={isArchived} className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
               <select name="clubId" defaultValue={swimmer.clubId ?? ""} disabled={isArchived} className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100">
                 <option value="">Sans club</option>
                 {clubs.map((club) => (

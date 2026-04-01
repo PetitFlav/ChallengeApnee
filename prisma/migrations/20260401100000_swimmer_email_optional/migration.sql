@@ -1,0 +1,1 @@
+ALTER TABLE "swimmers" ALTER COLUMN "email" DROP NOT NULL;

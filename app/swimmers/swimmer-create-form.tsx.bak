@@ -54,7 +54,7 @@ export function SwimmerCreateForm({ clubs, sections, defaultNumber, action, defa
       />
       <input name="firstName" disabled={disabled} placeholder="Prénom" required className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
       <input name="lastName" disabled={disabled} placeholder="Nom" required className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
-      <input name="email" disabled={disabled} type="email" placeholder="Email (optionnel)" className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
+      <input name="email" disabled={disabled} type="email" placeholder="Email" required className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100" />
       <select name="clubId" defaultValue={defaultClubId} disabled={disabled} className="rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100">
         <option value="">Sans club</option>
         {clubs.map((club) => (
