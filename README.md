@@ -1,39 +1,35 @@
-# Challenge Apnée – Application de saisie des distances
+# Challenge Apnée — Application de gestion d'événement
 
 ## Objectif
 
-Cette application web sert à gérer la saisie des distances nagées pendant un challenge piscine annuel.
+Application web de gestion complète d'un challenge piscine annuel.
 
-Elle doit permettre :
+Elle permet :
 
-- d’enregistrer les nageurs avant le début du challenge,
-- de saisir rapidement les feuilles papier récupérées pendant l’événement,
-- de calculer automatiquement les distances nagées,
-- d’éviter les doublons de saisie,
-- d’afficher les résultats en direct,
-- d’afficher un écran public avec le total global en grand,
-- de produire des statistiques complémentaires par club et par section.
+- de configurer l'événement (lignes, tournées, durée)
+- d'enregistrer les nageurs avant le challenge
+- de saisir rapidement les feuilles papier pendant l'événement
+- de calculer automatiquement les distances nagées
+- d'éviter les doublons de saisie
+- de vérifier les saisies via un système de double saisie
+- d'afficher les résultats en direct
+- d'afficher un écran public avec le total global
+- de produire des statistiques par nageur, club et section
+- de gérer plusieurs éditions annuelles (multi-challenges)
+
+---
 
 ## Contexte métier
 
-Le challenge dure 2 heures.
+Le challenge dure 2 heures. Des bénévoles en bord de ligne notent les longueurs nagées sur des petites feuilles papier. Les feuilles sont ramassées en plusieurs tournées, puis 1 ou 2 personnes les ressaisissent dans l'application sur ordinateur portable.
 
-Des bénévoles en bord de ligne utilisent des petites feuilles papier pour noter les longueurs nagées par les participants.
+Chaque nageur possède un numéro unique pour tout le challenge. Les nageurs peuvent nager sur des lignes de 25 m ou 50 m, et changer de ligne pendant l'événement.
 
-Les feuilles sont ramassées en plusieurs tournées pendant le challenge, puis une ou deux personnes les ressaisissent dans l’application sur ordinateur portable.
-
-Chaque nageur possède un numéro unique pour tout le challenge.
-
-Les nageurs peuvent nager sur des lignes de 25 m ou de 50 m, et changer de ligne pendant l’événement.
+---
 
 ## Règles de comptage
 
-Les longueurs sont notées avec :
-
-- des carrés
-- des traits
-
-Règles :
+Les longueurs sont notées avec des carrés et des traits :
 
 - 1 carré = 4 longueurs
 - 1 trait = 1 longueur
@@ -43,235 +39,154 @@ Formules :
 - `totalLengths = squares * 4 + ticks`
 - `distanceM = totalLengths * lane.distanceM`
 
-Exemple :
+Exemple : 9 carrés + 2 traits = 38 longueurs → 950 m sur ligne 25 m / 1900 m sur ligne 50 m
 
-- 9 carrés + 2 traits = `9 * 4 + 2 = 38 longueurs`
-- sur une ligne de 25 m = `950 m`
-- sur une ligne de 50 m = `1900 m`
-
-## Fonctionnement de la saisie
-
-La saisie se fait **feuille par feuille**.
-
-Pour chaque feuille :
-
-1. le saisisseur choisit la tournée,
-2. puis la ligne,
-3. l’application déduit automatiquement la distance de ligne,
-4. puis le saisisseur entre les nageurs présents sur la feuille :
-   - numéro nageur
-   - carrés
-   - traits
-5. l’application calcule automatiquement :
-   - le nom du nageur
-   - le total de longueurs
-   - la distance en mètres
-6. la feuille est validée,
-7. puis le saisisseur passe à la feuille suivante.
-
-## Règle anti-doublon
-
-Une feuille est unique par :
-
-- challenge
-- tournée
-- ligne
-
-Il ne doit pas être possible de créer deux feuilles pour la même tournée et la même ligne.
-
-## Clubs et sections
-
-L’application doit aussi gérer l’origine des nageurs pour permettre des statistiques supplémentaires.
-
-### Club
-
-Chaque nageur peut être rattaché à un club.
-
-Objectifs :
-
-- distinguer les nageurs du club organisateur et les nageurs extérieurs,
-- calculer des statistiques par club,
-- filtrer les participants par club.
-
-Exemples :
-
-- club organisateur
-- club extérieur A
-- club extérieur B
-- indépendant / sans club
-
-### Section
-
-Pour les nageurs appartenant au club organisateur, il doit être possible d’indiquer une section interne.
-
-Sections prévues :
-
-- Apnéistes
-- Plongeurs
-- Chasseurs
-- Hockeyeurs
-
-### Règle métier
-
-- chaque nageur peut avoir un club,
-- la section est utilisée principalement pour les nageurs internes au club organisateur,
-- pour un nageur extérieur, la section peut être vide,
-- le caractère interne / extérieur peut être déduit à partir du club.
-
-### Statistiques souhaitées
-
-À terme, l’application doit permettre d’obtenir :
-
-- distance totale par club,
-- nombre de nageurs par club,
-- distance totale par section,
-- nombre de nageurs par section,
-- comparaison club organisateur / extérieurs.
-
-## Fonctionnalités prévues en V1
-
-- gestion des nageurs
-- gestion des clubs
-- gestion des sections
-- saisie d’une feuille complète
-- validation d’une feuille
-- contrôle et correction des feuilles
-- tableau de bord interne
-- écran public d’affichage
-- export CSV
-
-## Écrans prévus
-
-- `/swimmers` : gestion des nageurs
-- `/sheets/new` : saisie d’une feuille
-- `/sheets` : liste et contrôle des feuilles
-- `/dashboard` : résultats internes
-- `/public` : affichage public
+---
 
 ## Stack technique
 
-- Next.js
-- TypeScript
-- React
-- Tailwind CSS
-- PostgreSQL
-- Prisma ORM
+- **Next.js 14** (App Router) + **TypeScript**
+- **React 18** + **Tailwind CSS**
+- **Prisma ORM** + **PostgreSQL**
+- **Hébergement** : Vercel
+- **Base de données** : Supabase PostgreSQL
 
-## Hébergement prévu
+---
 
-- application web : Vercel
-- base de données : Supabase PostgreSQL
-
-## Structure métier principale
-
-### Nageur
-
-Chaque nageur possède :
-
-- un numéro unique
-- un prénom
-- un nom
-- un email
-- un club
-- éventuellement une section
-
-### Club
-
-Chaque club possède :
-
-- un nom
-- un indicateur permettant d’identifier le club organisateur
-
-### Section
-
-Chaque section possède :
-
-- un nom
-
-Valeurs prévues :
-
-- Apnéistes
-- Plongeurs
-- Chasseurs
-- Hockeyeurs
-
-### Feuille
-
-Chaque feuille correspond à :
-
-- une tournée
-- une ligne
-- une distance de ligne connue (25 m ou 50 m)
-
-### Entrée de feuille
-
-Chaque ligne de feuille contient :
-
-- un nageur
-- un nombre de carrés
-- un nombre de traits
-- un total de longueurs
-- une distance calculée
-
-## Priorités du projet
-
-1. rapidité de saisie sur ordinateur portable
-2. simplicité d’utilisation
-3. fiabilité des calculs
-4. prévention des doublons
-5. réutilisation annuelle
-6. statistiques utiles par club et section
-
-## Hors périmètre V1
-
-- application mobile native
-- saisie directe par les bénévoles en bord de bassin
-- rôles complexes
-- statistiques avancées trop détaillées
-- websocket temps réel avancé
-- design sophistiqué
-
-## Documentation complémentaire
-
-- `SPEC.md` : cahier des charges détaillé
-- `AGENTS.md` : règles projet pour Codex
-- `PROMPT_CODEX.md` : prompt complet à utiliser avec Codex
-
-## Lancement du projet
-
-À compléter quand le projet Next.js sera généré.
-
-Exemple cible :
+## Installation
 
 ```bash
 npm install
+npx prisma generate
 npm run dev
+```
 
-## Login simple (V1)
+### Variables d'environnement
 
-Cette version ajoute un login email + mot de passe avec session HTTP-only.
+Créer un fichier `.env` à la racine (ne jamais commiter ce fichier) :
 
-### Pré-requis
+```env
+DATABASE_URL="postgresql://..."
+DIRECT_URL="postgresql://..."
+AUTH_SECRET="une-chaine-aleatoire-longue"
+```
 
-- Définir `AUTH_SECRET` (chaîne aléatoire) dans `.env`.
-- Exécuter les migrations Prisma (`npx prisma migrate dev`).
+### Initialiser la base de données
 
-### Créer un utilisateur de test
+```bash
+npx prisma migrate deploy
+npx prisma db seed
+```
+
+### Créer un utilisateur
 
 ```bash
 TEST_USER_EMAIL=admin@example.com \
-TEST_USER_PASSWORD='ChangeMe123!' \
+TEST_USER_PASSWORD='MotDePasse123!' \
 TEST_USER_FIRST_NAME='Admin' \
 TEST_USER_LAST_NAME='Challenge' \
-TEST_USER_CHALLENGE_ID='<challengeId>' \
 npm run user:create
 ```
 
-- Si `TEST_USER_CHALLENGE_ID` est défini, l’utilisateur est affilié à cet événement.
-- Si besoin, passez `isSuperUser=true` directement en base pour donner l’accès à tous les événements.
+Pour un accès super-utilisateur (tous les challenges), passer `isSuperUser = true` directement en base.
 
-### Flux
+---
 
-- `/login` : connexion email + mot de passe.
-- Bouton **Se déconnecter** : suppression de session.
-- Les pages métier sont protégées côté serveur et filtrées selon les événements autorisés.
+## Authentification
+
+Login email + mot de passe avec session HTTP-only (cookie signé HMAC-SHA256, durée 7 jours).
+
+- `/login` : connexion
+- Bouton **Se déconnecter** : suppression de session
+- Pages métier protégées côté serveur
+- Accès filtré selon les challenges affiliés à l'utilisateur
+
+---
+
+## Écrans disponibles
+
+| Route | Description |
+|---|---|
+| `/` | Menu principal |
+| `/login` | Connexion |
+| `/events` | Gestion des challenges (superUser) |
+| `/events/new` | Créer un challenge |
+| `/swimmers` | Gestion des nageurs, clubs, sections |
+| `/swimmers/print` | Impression tableau nageurs |
+| `/sheets/new` | Saisie d'une feuille |
+| `/sheets` | Liste et contrôle des feuilles |
+| `/sheets/[id]` | Détail / vérification d'une feuille |
+| `/dashboard` | Tableau de bord + vérification |
+| `/statistics` | Statistiques par nageur / club / section |
+| `/statistics/print` | Version imprimable des statistiques |
+| `/public` | Écran public live (accès libre) |
+| `/admin/users` | Administration des utilisateurs (superUser) |
+
+---
+
+## Modèle de données
+
+### Challenge
+Événement annuel pivot. Contient : nom, date, heure de début, durée, nombre de tournées, nombre de lignes 25 m / 50 m, statut actif/archivé, date de clôture, club organisateur.
+
+### Nageur
+Rattaché à un challenge. Possède un numéro unique par challenge, prénom, nom, email (optionnel), club (optionnel), section (optionnelle).
+
+### Club
+Global (partagé entre challenges). Rattaché à un challenge via `ChallengeClub`. Permet de distinguer le club organisateur des clubs extérieurs.
+
+### Section
+Valeurs : Apnéistes, Plongeurs, Chasseurs, Hockeyeurs. Optionnelle, principalement pour les nageurs du club organisateur.
+
+### Lane (Ligne)
+Générée automatiquement à la création du challenge. Code : `25-1`, `25-2`, ..., `50-1`, `50-2`, etc.
+
+### Round (Tournée)
+Générée automatiquement. Horaires calculés à partir de l'heure de début et de la durée.
+
+### Sheet (Feuille)
+Unique par `(challenge, round, lane)`. Statut : `DRAFT` ou `VALIDATED`.
+
+### SheetEntry (Ligne de feuille)
+Un nageur sur une feuille. Contient : carrés, traits, total longueurs, distance calculée.
+
+### Verification / VerificationLine
+Système de double saisie pour contrôle. Une vérification compare la saisie originale avec une seconde saisie indépendante.
+
+### FinalResult
+Résultat consolidé par nageur après validation. Source : `original`, `verification`, ou `manual`.
+
+---
+
+## Processus de validation
+
+1. **Saisie** → création d'une `Sheet` avec ses `SheetEntry` (statut `DRAFT`)
+2. **Vérification** → double saisie indépendante (`Verification` + `VerificationLine`)
+3. **Comparaison** → l'application détecte les écarts entre saisie et vérification
+4. **Validation** → création des `FinalResult` (source selon résultat)
+
+---
+
+## Gestion des accès
+
+| Profil | Accès |
+|---|---|
+| Super-utilisateur | Tous les challenges, tous les modules |
+| Utilisateur affilié | Challenge(s) assigné(s) uniquement |
+| Après clôture | Vérification, saisie, dashboard, écran public uniquement |
+| Écran public | Accès libre sans connexion |
+
+---
+
+## Réutilisation annuelle
+
+Chaque édition est un nouveau `Challenge`. Les clubs sont partagés entre éditions. Les nageurs, lignes, tournées et feuilles sont propres à chaque challenge.
+
+---
+
+## Déploiement
+
+- **Vercel** : déploiement automatique depuis GitHub (branche `main`)
+- **Supabase** : base PostgreSQL hébergée
+- Variables d'environnement à configurer dans Vercel (`DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`)
+- Migrations : `npx prisma migrate deploy` (à lancer une fois après chaque évolution du schéma)
