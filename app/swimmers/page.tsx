@@ -115,7 +115,7 @@ async function createSwimmer(_prevState: CreateSwimmerState, formData: FormData)
           number,
           firstName: String(formData.get("firstName") || "").trim(),
           lastName: String(formData.get("lastName") || "").trim(),
-          email: String(formData.get("email") || "").trim() || null,
+          email: String(formData.get("email") || "").trim() || undefined,
           clubId,
           sectionId,
         },
