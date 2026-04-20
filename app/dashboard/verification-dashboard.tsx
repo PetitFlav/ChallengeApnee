@@ -12,6 +12,8 @@ type VerificationDetailRow = {
   totalLengths: number;
   distanceM: number;
   createdAtLabel: string;
+  isNew: boolean;
+  isValidated: boolean;
 };
 
 type FinalSelection = {
@@ -40,6 +42,7 @@ type SwimmerRow = {
   section: string;
   status: DashboardSwimmerStatus;
   hasDifferences: boolean;
+  hasNewVerification: boolean;
   originalEntry: {
     sheetEntryId: string;
     squares: number;
@@ -59,6 +62,7 @@ type LaneRow = {
   verificationsCount: number;
   differencesCount: number;
   unresolvedDifferencesCount: number;
+  hasNewVerification: boolean;
   status: DashboardVerificationStatus;
   swimmers: SwimmerRow[];
 };
@@ -71,17 +75,10 @@ type RoundRow = {
   verifiersCount: number;
   differencesCount: number;
   unresolvedDifferencesCount: number;
+  hasNewVerification: boolean;
   status: DashboardVerificationStatus;
   lanes: LaneRow[];
 };
-
-function getVerificationStatusClassName(status: DashboardVerificationStatus) {
-  if (status === "Vérifiée avec écarts (Validé)") {
-    return "text-emerald-700 font-medium";
-  }
-
-  return "text-slate-900";
-}
 
 type DashboardSummary = {
   totalLines: number;
@@ -90,6 +87,40 @@ type DashboardSummary = {
   finalValidatedLines: number;
   remainingDifferences: number;
 };
+
+// ─── Helpers couleur ──────────────────────────────────────────────────────────
+
+function getVerificationStatusClassName(status: DashboardVerificationStatus) {
+  if (status === "Vérifiée avec écarts (Validé)") return "text-emerald-700 font-medium";
+  return "text-slate-900";
+}
+
+/** Couleur de la cellule statut pour une tournée ou une ligne (niveau 1 et 2).
+ *  Jaune prioritaire si une nouvelle vérification non validée existe. */
+function getRoundOrLaneRowClassName(hasNewVerification: boolean, isSelected: boolean) {
+  if (isSelected) return "cursor-pointer bg-blue-50";
+  if (hasNewVerification) return "cursor-pointer bg-amber-50 hover:bg-amber-100";
+  return "cursor-pointer hover:bg-slate-50";
+}
+
+/** Badge coloré pour signaler l'état isNew / isValidated d'une ligne de vérif. */
+function VerificationLineBadge({ isNew, isValidated }: { isNew: boolean; isValidated: boolean }) {
+  if (isValidated) {
+    return (
+      <span className="ml-1 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-700">
+        ✓ validée
+      </span>
+    );
+  }
+  if (isNew) {
+    return (
+      <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">
+        ● nouvelle
+      </span>
+    );
+  }
+  return null;
+}
 
 export function VerificationDashboard({
   rounds,
@@ -127,6 +158,9 @@ export function VerificationDashboard({
     const roundId = String(formData.get("roundId") ?? "");
     const laneId = String(formData.get("laneId") ?? "");
     const swimmerId = String(formData.get("swimmerId") ?? "");
+    const sourceVerificationLineId = formData.get("sourceVerificationLineId")
+      ? String(formData.get("sourceVerificationLineId"))
+      : null;
 
     if (!roundId || !laneId || !swimmerId) {
       setSelectedSwimmer(null);
@@ -138,9 +172,12 @@ export function VerificationDashboard({
     const ticks = Number(formData.get("ticks") ?? 0);
     const totalLengths = Number(formData.get("totalLengths") ?? 0);
     const distanceM = Number(formData.get("distanceM") ?? 0);
-    const sourceVerificationId = formData.get("sourceVerificationId") ? String(formData.get("sourceVerificationId")) : null;
-    const sourceVerificationLineId = formData.get("sourceVerificationLineId") ? String(formData.get("sourceVerificationLineId")) : null;
-    const sourceSheetEntryId = formData.get("sourceSheetEntryId") ? String(formData.get("sourceSheetEntryId")) : null;
+    const sourceVerificationId = formData.get("sourceVerificationId")
+      ? String(formData.get("sourceVerificationId"))
+      : null;
+    const sourceSheetEntryId = formData.get("sourceSheetEntryId")
+      ? String(formData.get("sourceSheetEntryId"))
+      : null;
 
     const nextFinalSelection: FinalSelection = {
       source: source === "original" || source === "verification" ? source : "manual",
@@ -155,25 +192,32 @@ export function VerificationDashboard({
       validatedByName: "Vous",
     };
 
+    // Mise à jour optimiste : FinalSelection + flags isNew/isValidated côté client
     setDashboardRounds((previousRounds) =>
       previousRounds.map((round) => {
         if (round.roundId !== roundId) return round;
-
         return {
           ...round,
           lanes: round.lanes.map((lane) => {
             if (lane.laneId !== laneId) return lane;
-
-            return {
-              ...lane,
-              swimmers: lane.swimmers.map((swimmer) => {
-                if (swimmer.swimmerId !== swimmerId) return swimmer;
-                return {
-                  ...swimmer,
-                  finalSelection: nextFinalSelection,
-                };
-              }),
-            };
+            const updatedSwimmers = lane.swimmers.map((swimmer) => {
+              if (swimmer.swimmerId !== swimmerId) return swimmer;
+              return {
+                ...swimmer,
+                finalSelection: nextFinalSelection,
+                hasNewVerification: false,
+                verificationDetails: swimmer.verificationDetails.map((detail) => ({
+                  ...detail,
+                  isNew: false,
+                  isValidated:
+                    detail.verificationLineId === sourceVerificationLineId
+                      ? true
+                      : detail.isValidated,
+                })),
+              };
+            });
+            const hasNewVerification = updatedSwimmers.some((s) => s.hasNewVerification);
+            return { ...lane, swimmers: updatedSwimmers, hasNewVerification };
           }),
         };
       }),
@@ -186,9 +230,13 @@ export function VerificationDashboard({
     return swimmer.finalSelection ? "Validé" : swimmer.status;
   }
 
-
   function getSwimmerStatusClassName(swimmer: SwimmerRow) {
     const status = getSwimmerStatus(swimmer);
+
+    // Jaune prioritaire si nouvelle vérification non examinée
+    if (swimmer.hasNewVerification) {
+      return "rounded border border-amber-500 bg-amber-50 px-2 py-1 text-amber-700 hover:bg-amber-100";
+    }
 
     if (status === "Validé") {
       return "rounded border border-emerald-600 bg-emerald-50 px-2 py-1 text-emerald-700 hover:bg-emerald-100";
@@ -209,12 +257,16 @@ export function VerificationDashboard({
           <p className="text-sm text-slate-600">Navigation en 3 niveaux : tournée → ligne → nageurs.</p>
         </div>
         <form action={transferConformingLinesAction}>
-          <button type="submit" className="rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+          <button
+            type="submit"
+            className="rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+          >
             Transférer les lignes conformes
           </button>
         </form>
       </div>
 
+      {/* Compteurs */}
       <div className="grid gap-3 md:grid-cols-5">
         <article className="rounded border bg-slate-50 p-3">
           <p className="text-xs uppercase tracking-wide text-slate-500">Lignes totales saisies</p>
@@ -238,6 +290,7 @@ export function VerificationDashboard({
         </article>
       </div>
 
+      {/* Niveau 1 — Tournées */}
       <div className="overflow-x-auto rounded border">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50">
@@ -256,7 +309,10 @@ export function VerificationDashboard({
                 key={round.roundId}
                 role="button"
                 tabIndex={0}
-                className={selectedRoundId === round.roundId ? "cursor-pointer bg-blue-50" : "cursor-pointer hover:bg-slate-50"}
+                className={getRoundOrLaneRowClassName(
+                  round.hasNewVerification,
+                  selectedRoundId === round.roundId,
+                )}
                 onClick={() => {
                   setSelectedRoundId(round.roundId);
                   setSelectedLaneId(null);
@@ -270,18 +326,28 @@ export function VerificationDashboard({
                   }
                 }}
               >
-                <td className="p-2 font-medium text-blue-700">{round.roundLabel}</td>
+                <td className="p-2 font-medium text-blue-700">
+                  {round.roundLabel}
+                  {round.hasNewVerification ? (
+                    <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">
+                      nouvelle vérif
+                    </span>
+                  ) : null}
+                </td>
                 <td className="p-2">{round.lanesCount}</td>
                 <td className="p-2">{round.verificationsCount}</td>
                 <td className="p-2">{round.verifiersCount}</td>
                 <td className="p-2">{round.differencesCount}</td>
-                <td className={`p-2 ${getVerificationStatusClassName(round.status)}`}>{round.status}</td>
+                <td className={`p-2 ${getVerificationStatusClassName(round.status)}`}>
+                  {round.status}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
+      {/* Niveau 2 — Lignes de la tournée sélectionnée */}
       {selectedRound ? (
         <div className="space-y-3">
           <h3 className="text-lg font-semibold">Niveau 2 · Lignes de {selectedRound.roundLabel}</h3>
@@ -303,7 +369,10 @@ export function VerificationDashboard({
                     key={lane.laneId}
                     role="button"
                     tabIndex={0}
-                    className={selectedLaneId === lane.laneId ? "cursor-pointer bg-blue-50" : "cursor-pointer hover:bg-slate-50"}
+                    className={getRoundOrLaneRowClassName(
+                      lane.hasNewVerification,
+                      selectedLaneId === lane.laneId,
+                    )}
                     onClick={() => {
                       setSelectedLaneId(lane.laneId);
                       setSelectedSwimmer(null);
@@ -315,55 +384,20 @@ export function VerificationDashboard({
                       }
                     }}
                   >
-                    <td className="p-2 font-medium text-blue-700">{lane.laneCode}</td>
+                    <td className="p-2 font-medium text-blue-700">
+                      {lane.laneCode}
+                      {lane.hasNewVerification ? (
+                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">
+                          nouvelle vérif
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="p-2">{lane.distanceM} m</td>
                     <td className="p-2">{lane.swimmersCount}</td>
                     <td className="p-2">{lane.verificationsCount}</td>
                     <td className="p-2">{lane.differencesCount}</td>
-                    <td className={`p-2 ${getVerificationStatusClassName(lane.status)}`}>{lane.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : null}
-
-      {selectedLane ? (
-        <div className="space-y-3">
-          <h3 className="text-lg font-semibold">Niveau 3 · Détail nageurs {selectedLane.laneCode}</h3>
-          <div className="overflow-x-auto rounded border">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="p-2 text-left">Numéro</th>
-                  <th className="p-2 text-left">Nom</th>
-                  <th className="p-2 text-left">Prénom</th>
-                  <th className="p-2 text-left">Club</th>
-                  <th className="p-2 text-left">Section</th>
-                  <th className="p-2 text-left">Statut</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {selectedLane.swimmers.map((swimmer) => (
-                  <tr key={swimmer.swimmerKey}>
-                    <td className="p-2">{swimmer.swimmerNumber}</td>
-                    <td className="p-2">{swimmer.lastName}</td>
-                    <td className="p-2">{swimmer.firstName}</td>
-                    <td className="p-2">{swimmer.club}</td>
-                    <td className="p-2">{swimmer.section}</td>
-                    <td className="p-2">
-                      {swimmer.hasDifferences || swimmer.finalSelection ? (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedSwimmer(swimmer)}
-                          className={getSwimmerStatusClassName(swimmer)}
-                        >
-                          {getSwimmerStatus(swimmer)}
-                        </button>
-                      ) : (
-                        getSwimmerStatus(swimmer)
-                      )}
+                    <td className={`p-2 ${getVerificationStatusClassName(lane.status)}`}>
+                      {lane.status}
                     </td>
                   </tr>
                 ))}
@@ -373,42 +407,154 @@ export function VerificationDashboard({
         </div>
       ) : null}
 
-      {selectedSwimmer ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded bg-white p-4 shadow-lg">
-            <div className="mb-3 flex items-start justify-between gap-2">
-              <div>
-                <h4 className="text-lg font-semibold text-slate-900">
-                  Validation finale · #{selectedSwimmer.swimmerNumber} {selectedSwimmer.lastName} {selectedSwimmer.firstName}
-                </h4>
-                <p className="text-sm text-slate-600">
-                  Club: {selectedSwimmer.club} · Section: {selectedSwimmer.section}
-                </p>
-              </div>
-              <button type="button" onClick={() => setSelectedSwimmer(null)} className="rounded border px-2 py-1 text-sm">
-                Fermer
+      {/* Niveau 3 — Nageurs de la ligne sélectionnée */}
+      {selectedLane ? (
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold">
+            Niveau 3 · Nageurs de {selectedLane.laneCode} ({selectedLane.distanceM} m)
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {selectedLane.swimmers.map((swimmer) => (
+              <button
+                key={swimmer.swimmerKey}
+                type="button"
+                className={getSwimmerStatusClassName(swimmer)}
+                onClick={() => setSelectedSwimmer(swimmer)}
+              >
+                {swimmer.swimmerNumber} — {swimmer.lastName} {swimmer.firstName}
+                {swimmer.hasNewVerification ? " 🟡" : null}
               </button>
-            </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
-            <div className="space-y-3">
-              <h5 className="font-semibold">Saisie originale</h5>
-              {selectedSwimmer.originalEntry ? (
-                <table className="min-w-full divide-y divide-slate-200 rounded border text-sm">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <th className="p-2 text-left">Carrés</th>
-                      <th className="p-2 text-left">Traits</th>
-                      <th className="p-2 text-left">Longueurs</th>
-                      <th className="p-2 text-left">Distance</th>
-                      <th className="p-2 text-left">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="p-2">{selectedSwimmer.originalEntry.squares}</td>
-                      <td className="p-2">{selectedSwimmer.originalEntry.ticks}</td>
-                      <td className="p-2">{selectedSwimmer.originalEntry.totalLengths}</td>
-                      <td className="p-2">{selectedSwimmer.originalEntry.distanceM} m</td>
+      {/* Détail nageur */}
+      {selectedSwimmer ? (
+        <div className="space-y-3 rounded border border-slate-200 bg-slate-50 p-4">
+          <div className="flex items-start justify-between">
+            <h4 className="text-base font-semibold">
+              {selectedSwimmer.lastName} {selectedSwimmer.firstName} — #{selectedSwimmer.swimmerNumber}
+            </h4>
+            <button
+              type="button"
+              className="text-sm text-slate-500 hover:text-slate-700"
+              onClick={() => setSelectedSwimmer(null)}
+            >
+              Fermer
+            </button>
+          </div>
+
+          {/* Saisie originale */}
+          <div className="space-y-2">
+            <h5 className="font-semibold">Saisie originale</h5>
+            {selectedSwimmer.originalEntry ? (
+              <table className="min-w-full divide-y divide-slate-200 rounded border text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="p-2 text-left">Carrés</th>
+                    <th className="p-2 text-left">Traits</th>
+                    <th className="p-2 text-left">Longueurs</th>
+                    <th className="p-2 text-left">Distance</th>
+                    <th className="p-2 text-left">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="p-2">{selectedSwimmer.originalEntry.squares}</td>
+                    <td className="p-2">{selectedSwimmer.originalEntry.ticks}</td>
+                    <td className="p-2">{selectedSwimmer.originalEntry.totalLengths}</td>
+                    <td className="p-2">{selectedSwimmer.originalEntry.distanceM} m</td>
+                    <td className="p-2">
+                      <form
+                        action={saveFinalResultAction}
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          const formData = new FormData(event.currentTarget);
+                          void handleSaveFinalResult(formData);
+                        }}
+                      >
+                        <input type="hidden" name="sheetId" value={selectedSwimmer.sheetId} />
+                        <input type="hidden" name="roundId" value={selectedSwimmer.roundId} />
+                        <input type="hidden" name="laneId" value={selectedSwimmer.laneId} />
+                        <input type="hidden" name="swimmerId" value={selectedSwimmer.swimmerId} />
+                        <input type="hidden" name="source" value="original" />
+                        <input
+                          type="hidden"
+                          name="sourceSheetEntryId"
+                          value={selectedSwimmer.originalEntry.sheetEntryId}
+                        />
+                        <input
+                          type="hidden"
+                          name="squares"
+                          value={selectedSwimmer.originalEntry.squares}
+                        />
+                        <input
+                          type="hidden"
+                          name="ticks"
+                          value={selectedSwimmer.originalEntry.ticks}
+                        />
+                        <input
+                          type="hidden"
+                          name="totalLengths"
+                          value={selectedSwimmer.originalEntry.totalLengths}
+                        />
+                        <input
+                          type="hidden"
+                          name="distanceM"
+                          value={selectedSwimmer.originalEntry.distanceM}
+                        />
+                        <button
+                          type="submit"
+                          className="rounded bg-blue-600 px-2 py-1 text-white hover:bg-blue-700"
+                        >
+                          Retenir ce résultat
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            ) : (
+              <p className="text-sm text-slate-600">Aucune ligne de saisie originale disponible.</p>
+            )}
+          </div>
+
+          {/* Vérifications */}
+          <div className="mt-4 space-y-3">
+            <h5 className="font-semibold">Vérifications</h5>
+            {selectedSwimmer.verificationDetails.length > 0 ? (
+              <table className="min-w-full divide-y divide-slate-200 rounded border text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="p-2 text-left">Vérificateur</th>
+                    <th className="p-2 text-left">Carrés</th>
+                    <th className="p-2 text-left">Traits</th>
+                    <th className="p-2 text-left">Longueurs</th>
+                    <th className="p-2 text-left">Distance</th>
+                    <th className="p-2 text-left">Date/heure</th>
+                    <th className="p-2 text-left">Statut</th>
+                    <th className="p-2 text-left">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {selectedSwimmer.verificationDetails.map((line) => (
+                    <tr
+                      key={line.verificationLineId}
+                      className={line.isNew && !line.isValidated ? "bg-amber-50" : ""}
+                    >
+                      <td className="p-2">{line.verifierName}</td>
+                      <td className="p-2">{line.squares}</td>
+                      <td className="p-2">{line.ticks}</td>
+                      <td className="p-2">{line.totalLengths}</td>
+                      <td className="p-2">{line.distanceM} m</td>
+                      <td className="p-2">{line.createdAtLabel}</td>
+                      <td className="p-2">
+                        <VerificationLineBadge
+                          isNew={line.isNew}
+                          isValidated={line.isValidated}
+                        />
+                      </td>
                       <td className="p-2">
                         <form
                           action={saveFinalResultAction}
@@ -422,90 +568,47 @@ export function VerificationDashboard({
                           <input type="hidden" name="roundId" value={selectedSwimmer.roundId} />
                           <input type="hidden" name="laneId" value={selectedSwimmer.laneId} />
                           <input type="hidden" name="swimmerId" value={selectedSwimmer.swimmerId} />
-                          <input type="hidden" name="source" value="original" />
-                          <input type="hidden" name="sourceSheetEntryId" value={selectedSwimmer.originalEntry.sheetEntryId} />
-                          <input type="hidden" name="squares" value={selectedSwimmer.originalEntry.squares} />
-                          <input type="hidden" name="ticks" value={selectedSwimmer.originalEntry.ticks} />
-                          <input type="hidden" name="totalLengths" value={selectedSwimmer.originalEntry.totalLengths} />
-                          <input type="hidden" name="distanceM" value={selectedSwimmer.originalEntry.distanceM} />
-                          <button type="submit" className="rounded bg-blue-600 px-2 py-1 text-white hover:bg-blue-700">
+                          <input type="hidden" name="source" value="verification" />
+                          <input
+                            type="hidden"
+                            name="sourceVerificationId"
+                            value={line.verificationId}
+                          />
+                          <input
+                            type="hidden"
+                            name="sourceVerificationLineId"
+                            value={line.verificationLineId}
+                          />
+                          <input type="hidden" name="squares" value={line.squares} />
+                          <input type="hidden" name="ticks" value={line.ticks} />
+                          <input type="hidden" name="totalLengths" value={line.totalLengths} />
+                          <input type="hidden" name="distanceM" value={line.distanceM} />
+                          <button
+                            type="submit"
+                            className="rounded bg-blue-600 px-2 py-1 text-white hover:bg-blue-700"
+                          >
                             Retenir ce résultat
                           </button>
                         </form>
                       </td>
                     </tr>
-                  </tbody>
-                </table>
-              ) : (
-                <p className="text-sm text-slate-600">Aucune ligne de saisie originale disponible.</p>
-              )}
-            </div>
-
-            <div className="mt-4 space-y-3">
-              <h5 className="font-semibold">Vérifications</h5>
-              {selectedSwimmer.verificationDetails.length > 0 ? (
-                <table className="min-w-full divide-y divide-slate-200 rounded border text-sm">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <th className="p-2 text-left">Vérificateur</th>
-                      <th className="p-2 text-left">Carrés</th>
-                      <th className="p-2 text-left">Traits</th>
-                      <th className="p-2 text-left">Longueurs</th>
-                      <th className="p-2 text-left">Distance</th>
-                      <th className="p-2 text-left">Date/heure</th>
-                      <th className="p-2 text-left">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {selectedSwimmer.verificationDetails.map((line) => (
-                      <tr key={line.verificationLineId}>
-                        <td className="p-2">{line.verifierName}</td>
-                        <td className="p-2">{line.squares}</td>
-                        <td className="p-2">{line.ticks}</td>
-                        <td className="p-2">{line.totalLengths}</td>
-                        <td className="p-2">{line.distanceM} m</td>
-                        <td className="p-2">{line.createdAtLabel}</td>
-                        <td className="p-2">
-                          <form
-                            action={saveFinalResultAction}
-                            onSubmit={(event) => {
-                              event.preventDefault();
-                              const formData = new FormData(event.currentTarget);
-                              void handleSaveFinalResult(formData);
-                            }}
-                          >
-                            <input type="hidden" name="sheetId" value={selectedSwimmer.sheetId} />
-                            <input type="hidden" name="roundId" value={selectedSwimmer.roundId} />
-                            <input type="hidden" name="laneId" value={selectedSwimmer.laneId} />
-                            <input type="hidden" name="swimmerId" value={selectedSwimmer.swimmerId} />
-                            <input type="hidden" name="source" value="verification" />
-                            <input type="hidden" name="sourceVerificationId" value={line.verificationId} />
-                            <input type="hidden" name="sourceVerificationLineId" value={line.verificationLineId} />
-                            <input type="hidden" name="squares" value={line.squares} />
-                            <input type="hidden" name="ticks" value={line.ticks} />
-                            <input type="hidden" name="totalLengths" value={line.totalLengths} />
-                            <input type="hidden" name="distanceM" value={line.distanceM} />
-                            <button type="submit" className="rounded bg-blue-600 px-2 py-1 text-white hover:bg-blue-700">
-                              Retenir ce résultat
-                            </button>
-                          </form>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p className="text-sm text-slate-600">Aucune vérification disponible pour ce nageur.</p>
-              )}
-            </div>
-
-            {selectedSwimmer.finalSelection ? (
-              <div className="mt-4 rounded border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">
-                Résultat final actuel : {selectedSwimmer.finalSelection.source} · {selectedSwimmer.finalSelection.distanceM} m · validé par{" "}
-                {selectedSwimmer.finalSelection.validatedByName} le {selectedSwimmer.finalSelection.validatedAtLabel}
-              </div>
-            ) : null}
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="text-sm text-slate-600">Aucune vérification disponible pour ce nageur.</p>
+            )}
           </div>
+
+          {/* Résultat final actuel */}
+          {selectedSwimmer.finalSelection ? (
+            <div className="mt-4 rounded border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">
+              Résultat final actuel : {selectedSwimmer.finalSelection.source} ·{" "}
+              {selectedSwimmer.finalSelection.distanceM} m · validé par{" "}
+              {selectedSwimmer.finalSelection.validatedByName} le{" "}
+              {selectedSwimmer.finalSelection.validatedAtLabel}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </section>

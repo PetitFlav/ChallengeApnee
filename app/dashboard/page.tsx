@@ -20,6 +20,7 @@ export default async function DashboardPage() {
     await requireModuleAccess(user, "dashboard");
     const challenge = await requireChallengeForModule(user);
 
+    // ─── Action : retenir un résultat + marquer la ligne validée ──────────────
     async function saveFinalResult(formData: FormData) {
       "use server";
 
@@ -32,9 +33,15 @@ export default async function DashboardPage() {
       const laneId = String(formData.get("laneId") ?? "");
       const swimmerId = String(formData.get("swimmerId") ?? "");
       const source = String(formData.get("source") ?? "");
-      const sourceVerificationId = formData.get("sourceVerificationId") ? String(formData.get("sourceVerificationId")) : null;
-      const sourceVerificationLineId = formData.get("sourceVerificationLineId") ? String(formData.get("sourceVerificationLineId")) : null;
-      const sourceSheetEntryId = formData.get("sourceSheetEntryId") ? String(formData.get("sourceSheetEntryId")) : null;
+      const sourceVerificationId = formData.get("sourceVerificationId")
+        ? String(formData.get("sourceVerificationId"))
+        : null;
+      const sourceVerificationLineId = formData.get("sourceVerificationLineId")
+        ? String(formData.get("sourceVerificationLineId"))
+        : null;
+      const sourceSheetEntryId = formData.get("sourceSheetEntryId")
+        ? String(formData.get("sourceSheetEntryId"))
+        : null;
       const squares = Number(formData.get("squares") ?? 0);
       const ticks = Number(formData.get("ticks") ?? 0);
       const totalLengths = Number(formData.get("totalLengths") ?? 0);
@@ -50,6 +57,7 @@ export default async function DashboardPage() {
 
       if (!swimmer) return;
 
+      // 1. Upsert du FinalResult
       await prisma.finalResult.upsert({
         where: {
           challengeId_roundId_laneId_swimmerId: {
@@ -94,9 +102,29 @@ export default async function DashboardPage() {
         },
       });
 
+      // 2. Marquer la ligne retenue comme validée
+      if (sourceVerificationLineId) {
+        await prisma.verificationLine.update({
+          where: { id: sourceVerificationLineId },
+          data: { isValidated: true },
+        });
+      }
+
+      // 3. Toutes les lignes du nageur sur cette feuille → isNew = false
+      if (sourceVerificationId && swimmerId) {
+        await prisma.verificationLine.updateMany({
+          where: {
+            swimmerId,
+            verification: { sheetId },
+          },
+          data: { isNew: false },
+        });
+      }
+
       revalidatePath("/dashboard");
     }
 
+    // ─── Action : transfert en masse des lignes conformes ────────────────────
     async function transferConformingLines() {
       "use server";
 
@@ -122,7 +150,9 @@ export default async function DashboardPage() {
             },
           },
           verifications: {
+            orderBy: { createdAt: "desc" },
             select: {
+              id: true,
               lines: {
                 select: {
                   id: true,
@@ -132,7 +162,11 @@ export default async function DashboardPage() {
                   ticks: true,
                   totalLengths: true,
                   distanceM: true,
+                  isNew: true,
+                  isValidated: true,
+                  createdAt: true,
                 },
+                orderBy: { createdAt: "desc" },
               },
             },
           },
@@ -140,34 +174,83 @@ export default async function DashboardPage() {
       });
 
       const upserts: Array<ReturnType<typeof prisma.finalResult.upsert>> = [];
+      const lineIdsToValidate: string[] = [];
+      const swimmerSheetPairsToMarkNotNew: Array<{ swimmerId: string; sheetId: string }> = [];
 
       for (const sheet of sheets) {
-        const verificationLinesBySwimmer = new Map<string, Array<(typeof sheet.verifications)[number]["lines"][number]>>();
+        // Ligne de vérification la plus récente par nageur
+        const latestLineBySwimmer = new Map<
+          string,
+          {
+            id: string;
+            verificationId: string;
+            squares: number;
+            ticks: number;
+            totalLengths: number;
+            distanceM: number;
+            isNew: boolean;
+            isValidated: boolean;
+          }
+        >();
 
         for (const verification of sheet.verifications) {
           for (const line of verification.lines) {
-            const existing = verificationLinesBySwimmer.get(line.swimmerId) ?? [];
-            existing.push(line);
-            verificationLinesBySwimmer.set(line.swimmerId, existing);
+            if (!latestLineBySwimmer.has(line.swimmerId)) {
+              latestLineBySwimmer.set(line.swimmerId, {
+                id: line.id,
+                verificationId: line.verificationId,
+                squares: line.squares,
+                ticks: line.ticks,
+                totalLengths: line.totalLengths,
+                distanceM: line.distanceM,
+                isNew: line.isNew,
+                isValidated: line.isValidated,
+              });
+            }
           }
         }
 
         for (const entry of sheet.entries) {
-          const verificationLines = verificationLinesBySwimmer.get(entry.swimmerId) ?? [];
+          const latestLine = latestLineBySwimmer.get(entry.swimmerId);
 
-          if (verificationLines.length === 0) {
-            continue;
+          // Pas de vérification → on ne touche pas au FinalResult existant
+          if (!latestLine) continue;
+
+          const isConforming =
+            latestLine.squares === entry.squares && latestLine.ticks === entry.ticks;
+
+          // Règles de finalisation :
+          // 1. Original = vérif            → source "original",      valeurs communes,        on valide la ligne
+          // 2. Original ≠ vérif, validée   → source "verification",  valeurs de la vérif
+          // 3. Original ≠ vérif, non val.  → source "original",      valeurs originales       (en attente)
+          let source: "original" | "verification";
+          let squares: number;
+          let ticks: number;
+          let totalLengths: number;
+          let distanceM: number;
+
+          if (isConforming) {
+            source = "original";
+            squares = entry.squares;
+            ticks = entry.ticks;
+            totalLengths = entry.totalLengths;
+            distanceM = entry.distanceM;
+            lineIdsToValidate.push(latestLine.id);
+            swimmerSheetPairsToMarkNotNew.push({ swimmerId: entry.swimmerId, sheetId: sheet.id });
+          } else if (latestLine.isValidated) {
+            source = "verification";
+            squares = latestLine.squares;
+            ticks = latestLine.ticks;
+            totalLengths = latestLine.totalLengths;
+            distanceM = latestLine.distanceM;
+          } else {
+            // Différence non encore validée : on garde l'original en attendant
+            source = "original";
+            squares = entry.squares;
+            ticks = entry.ticks;
+            totalLengths = entry.totalLengths;
+            distanceM = entry.distanceM;
           }
-
-          const allConforming = verificationLines.every(
-            (line) => line.squares === entry.squares && line.ticks === entry.ticks,
-          );
-
-          if (!allConforming) {
-            continue;
-          }
-
-          const firstVerificationLine = verificationLines[0] ?? null;
 
           upserts.push(
             prisma.finalResult.upsert({
@@ -183,14 +266,14 @@ export default async function DashboardPage() {
                 sheetId: sheet.id,
                 clubId: entry.swimmer.clubId,
                 sectionId: entry.swimmer.sectionId,
-                source: "original",
-                sourceVerificationId: firstVerificationLine?.verificationId ?? null,
-                sourceVerificationLineId: firstVerificationLine?.id ?? null,
+                source,
+                sourceVerificationId: latestLine.verificationId,
+                sourceVerificationLineId: latestLine.id,
                 sourceSheetEntryId: entry.id,
-                squares: entry.squares,
-                ticks: entry.ticks,
-                totalLengths: entry.totalLengths,
-                distanceM: entry.distanceM,
+                squares,
+                ticks,
+                totalLengths,
+                distanceM,
                 validatedByUserId: user.id,
                 validatedAt: new Date(),
               },
@@ -202,14 +285,14 @@ export default async function DashboardPage() {
                 swimmerId: entry.swimmerId,
                 clubId: entry.swimmer.clubId,
                 sectionId: entry.swimmer.sectionId,
-                source: "original",
-                sourceVerificationId: firstVerificationLine?.verificationId ?? null,
-                sourceVerificationLineId: firstVerificationLine?.id ?? null,
+                source,
+                sourceVerificationId: latestLine.verificationId,
+                sourceVerificationLineId: latestLine.id,
                 sourceSheetEntryId: entry.id,
-                squares: entry.squares,
-                ticks: entry.ticks,
-                totalLengths: entry.totalLengths,
-                distanceM: entry.distanceM,
+                squares,
+                ticks,
+                totalLengths,
+                distanceM,
                 validatedByUserId: user.id,
               },
             }),
@@ -221,9 +304,29 @@ export default async function DashboardPage() {
         await prisma.$transaction(upserts);
       }
 
+      // Lignes conformes → isValidated = true
+      if (lineIdsToValidate.length > 0) {
+        await prisma.verificationLine.updateMany({
+          where: { id: { in: lineIdsToValidate } },
+          data: { isValidated: true },
+        });
+      }
+
+      // Nageurs/feuilles conformes → toutes leurs lignes isNew = false
+      for (const pair of swimmerSheetPairsToMarkNotNew) {
+        await prisma.verificationLine.updateMany({
+          where: {
+            swimmerId: pair.swimmerId,
+            verification: { sheetId: pair.sheetId },
+          },
+          data: { isNew: false },
+        });
+      }
+
       revalidatePath("/dashboard");
     }
 
+    // ─── Chargement des données ───────────────────────────────────────────────
     const [sheetEntries, rounds, finalResults] = await Promise.all([
       prisma.sheetEntry.findMany({
         where: { sheet: { challengeId: challenge.id } },
@@ -286,6 +389,8 @@ export default async function DashboardPage() {
                       ticks: true,
                       totalLengths: true,
                       distanceM: true,
+                      isNew: true,
+                      isValidated: true,
                     },
                   },
                 },
@@ -346,17 +451,29 @@ export default async function DashboardPage() {
         }));
 
         const verificationLines = latestVerification
-          ? latestVerification.lines.map((line) => ({ swimmerNumber: line.swimmer.number, squares: line.squares, ticks: line.ticks }))
+          ? latestVerification.lines.map((line) => ({
+              swimmerNumber: line.swimmer.number,
+              squares: line.squares,
+              ticks: line.ticks,
+            }))
           : null;
 
-        const differencesCount = verificationLines ? countComparisonDifferences(compareSheetAndVerification(originalLines, verificationLines)) : 0;
+        const differencesCount = verificationLines
+          ? countComparisonDifferences(compareSheetAndVerification(originalLines, verificationLines))
+          : 0;
 
         const entryBySwimmer = new Map(sheet.entries.map((entry) => [entry.swimmer.id, entry]));
-        const allVerificationLinesBySwimmer = new Map<string, Array<(typeof sheet.verifications)[number]["lines"][number] & {
-          verificationId: string;
-          verifierName: string;
-          createdAtLabel: string;
-        }>>();
+
+        const allVerificationLinesBySwimmer = new Map<
+          string,
+          Array<
+            (typeof sheet.verifications)[number]["lines"][number] & {
+              verificationId: string;
+              verifierName: string;
+              createdAtLabel: string;
+            }
+          >
+        >();
 
         for (const verification of sheet.verifications) {
           for (const line of verification.lines) {
@@ -371,9 +488,14 @@ export default async function DashboardPage() {
           }
         }
 
-        const latestVerificationLineBySwimmer = new Map((latestVerification?.lines ?? []).map((line) => [line.swimmer.id, line]));
+        const latestVerificationLineBySwimmer = new Map(
+          (latestVerification?.lines ?? []).map((line) => [line.swimmer.id, line]),
+        );
 
-        const swimmerIds = new Set<string>([...entryBySwimmer.keys(), ...latestVerificationLineBySwimmer.keys()]);
+        const swimmerIds = new Set<string>([
+          ...entryBySwimmer.keys(),
+          ...latestVerificationLineBySwimmer.keys(),
+        ]);
 
         const swimmers = Array.from(swimmerIds)
           .map((swimmerId) => {
@@ -381,17 +503,24 @@ export default async function DashboardPage() {
             const verificationLine = latestVerificationLineBySwimmer.get(swimmerId);
             const swimmer = entry?.swimmer ?? verificationLine?.swimmer;
 
-            if (!swimmer) {
-              return null;
-            }
+            if (!swimmer) return null;
 
             let status: DashboardSwimmerStatus = "OK";
             if (!verificationLine) status = "Absent en vérification";
             else if (!entry) status = "Ajouté en vérification";
-            else if (entry.squares !== verificationLine.squares || entry.ticks !== verificationLine.ticks) status = "Différence";
+            else if (
+              entry.squares !== verificationLine.squares ||
+              entry.ticks !== verificationLine.ticks
+            )
+              status = "Différence";
 
             const hasDifferences = status !== "OK";
-            const finalSelection = finalResultByKey.get(`${round.id}-${sheet.lane.id}-${swimmer.id}`) ?? null;
+            const finalSelection =
+              finalResultByKey.get(`${round.id}-${sheet.lane.id}-${swimmer.id}`) ?? null;
+
+            const allLines = allVerificationLinesBySwimmer.get(swimmer.id) ?? [];
+            // Signal jaune : au moins une ligne isNew = true non encore validée
+            const hasNewVerification = allLines.some((line) => line.isNew && !line.isValidated);
 
             return {
               swimmerKey: `${sheet.id}-${swimmer.id}`,
@@ -406,6 +535,7 @@ export default async function DashboardPage() {
               section: swimmer.section?.name ?? "-",
               status,
               hasDifferences,
+              hasNewVerification,
               originalEntry: entry
                 ? {
                     sheetEntryId: entry.id,
@@ -415,7 +545,7 @@ export default async function DashboardPage() {
                     distanceM: entry.distanceM,
                   }
                 : null,
-              verificationDetails: (allVerificationLinesBySwimmer.get(swimmer.id) ?? []).map((line) => ({
+              verificationDetails: allLines.map((line) => ({
                 verificationId: line.verificationId,
                 verificationLineId: line.id,
                 verifierName: line.verifierName,
@@ -424,6 +554,8 @@ export default async function DashboardPage() {
                 totalLengths: line.totalLengths,
                 distanceM: line.distanceM,
                 createdAtLabel: line.createdAtLabel,
+                isNew: line.isNew,
+                isValidated: line.isValidated,
               })),
               finalSelection,
             };
@@ -431,7 +563,11 @@ export default async function DashboardPage() {
           .filter((swimmer): swimmer is NonNullable<typeof swimmer> => swimmer !== null)
           .sort((a, b) => a.swimmerNumber - b.swimmerNumber);
 
-        const unresolvedDifferencesCount = swimmers.filter((swimmer) => swimmer.hasDifferences && !swimmer.finalSelection).length;
+        const unresolvedDifferencesCount = swimmers.filter(
+          (swimmer) => swimmer.hasDifferences && !swimmer.finalSelection,
+        ).length;
+
+        const hasNewVerification = swimmers.some((swimmer) => swimmer.hasNewVerification);
 
         return {
           laneId: sheet.lane.id,
@@ -441,6 +577,7 @@ export default async function DashboardPage() {
           verificationsCount: sheet.verifications.length,
           differencesCount,
           unresolvedDifferencesCount,
+          hasNewVerification,
           status: getDashboardVerificationStatus({
             sheetsCount: 1,
             verifiedSheetsCount: latestVerification ? 1 : 0,
@@ -452,10 +589,16 @@ export default async function DashboardPage() {
       });
 
       const verificationsCount = round.sheets.reduce((sum, sheet) => sum + sheet.verifications.length, 0);
-      const verifiersCount = new Set(round.sheets.flatMap((sheet) => sheet.verifications.map((verification) => verification.userId))).size;
+      const verifiersCount = new Set(
+        round.sheets.flatMap((sheet) => sheet.verifications.map((v) => v.userId)),
+      ).size;
       const differencesCount = lanes.reduce((sum, lane) => sum + lane.differencesCount, 0);
-      const unresolvedDifferencesCount = lanes.reduce((sum, lane) => sum + lane.unresolvedDifferencesCount, 0);
+      const unresolvedDifferencesCount = lanes.reduce(
+        (sum, lane) => sum + lane.unresolvedDifferencesCount,
+        0,
+      );
       const verifiedSheetsCount = round.sheets.filter((sheet) => sheet.verifications.length > 0).length;
+      const hasNewVerification = lanes.some((lane) => lane.hasNewVerification);
 
       return {
         roundId: round.id,
@@ -465,6 +608,7 @@ export default async function DashboardPage() {
         verifiersCount,
         differencesCount,
         unresolvedDifferencesCount,
+        hasNewVerification,
         status: getDashboardVerificationStatus({
           sheetsCount: round.sheets.length,
           verifiedSheetsCount,
@@ -482,9 +626,10 @@ export default async function DashboardPage() {
         round.sheets.reduce((sheetSum, sheet) => {
           const latestVerification = sheet.verifications[0] ?? null;
           if (!latestVerification) return sheetSum;
-
           const originalSwimmerIds = new Set(sheet.entries.map((entry) => entry.swimmer.id));
-          const verifiedCount = latestVerification.lines.filter((line) => originalSwimmerIds.has(line.swimmer.id)).length;
+          const verifiedCount = latestVerification.lines.filter((line) =>
+            originalSwimmerIds.has(line.swimmer.id),
+          ).length;
           return sheetSum + verifiedCount;
         }, 0),
       0,
@@ -495,30 +640,51 @@ export default async function DashboardPage() {
       (sum, round) =>
         sum +
         round.lanes.reduce(
-          (laneSum, lane) => laneSum + lane.swimmers.filter((swimmer) => swimmer.hasDifferences && !swimmer.finalSelection).length,
+          (laneSum, lane) =>
+            laneSum +
+            lane.swimmers.filter((swimmer) => swimmer.hasDifferences && !swimmer.finalSelection).length,
           0,
         ),
       0,
     );
+
+    const challenge2 = await prisma.challenge.findFirst({
+      where: { id: challenge.id },
+      select: {
+        name: true,
+        eventDate: true,
+        startTime: true,
+        durationMinutes: true,
+        roundsCount: true,
+        lanes25Count: true,
+        lanes50Count: true,
+      },
+    });
 
     return (
       <div className="space-y-6">
         <BackToMainMenuLink />
         <div>
           <h1 className="text-3xl font-semibold">Dashboard</h1>
-          <p className="text-slate-600">Vue de contrôle dédiée aux vérifications, écarts, validations et statuts.</p>
+          <p className="text-slate-600">
+            Vue de contrôle dédiée aux vérifications, écarts, validations et statuts.
+          </p>
         </div>
 
-        <section className="rounded border bg-white p-4">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">Événement</h2>
-          <p className="mt-2 text-xl font-semibold text-slate-900">{challenge.name}</p>
-          <p className="text-slate-600">
-            {challenge.eventDate.toLocaleDateString("fr-FR")} · début {challenge.startTime} · durée {challenge.durationMinutes} min
-          </p>
-          <p className="text-slate-600">
-            {challenge.roundsCount} tournées · {challenge.lanes25Count} lignes 25m · {challenge.lanes50Count} lignes 50m
-          </p>
-        </section>
+        {challenge2 ? (
+          <section className="rounded border bg-white p-4">
+            <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">Événement</h2>
+            <p className="mt-2 text-xl font-semibold text-slate-900">{challenge2.name}</p>
+            <p className="text-slate-600">
+              {challenge2.eventDate.toLocaleDateString("fr-FR")} · début {challenge2.startTime} · durée{" "}
+              {challenge2.durationMinutes} min
+            </p>
+            <p className="text-slate-600">
+              {challenge2.roundsCount} tournées · {challenge2.lanes25Count} lignes 25m ·{" "}
+              {challenge2.lanes50Count} lignes 50m
+            </p>
+          </section>
+        ) : null}
 
         <VerificationDashboard
           rounds={verificationRounds}
@@ -545,7 +711,9 @@ export default async function DashboardPage() {
           Erreur de chargement du dashboard
         </div>
         {error instanceof Error && error.message ? (
-          <div className="rounded border border-slate-300 bg-slate-50 p-4 text-slate-700">{error.message}</div>
+          <div className="rounded border border-slate-300 bg-slate-50 p-4 text-slate-700">
+            {error.message}
+          </div>
         ) : null}
       </div>
     );

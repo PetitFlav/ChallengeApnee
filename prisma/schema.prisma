@@ -215,6 +215,10 @@ model VerificationLine {
   ticks          Int
   totalLengths   Int
   distanceM      Int
+  // true  = ligne créée/modifiée, pas encore examinée par un opérateur
+  isNew          Boolean       @default(true)
+  // true  = opérateur a cliqué "Retenir ce résultat" sur cette ligne
+  isValidated    Boolean       @default(false)
   createdAt      DateTime      @default(now())
   finalResults   FinalResult[]
   swimmer        Swimmer       @relation(fields: [swimmerId], references: [id])
@@ -223,6 +227,8 @@ model VerificationLine {
   @@index([verificationId])
   @@index([swimmerId])
   @@index([verificationId, swimmerId])
+  @@index([isNew])
+  @@index([isValidated])
   @@map("verification_lines")
 }
 
